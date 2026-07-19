@@ -39,5 +39,10 @@ namespace FRITES_Design
         {
 
         }
+
+        private void PreviewForm_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }

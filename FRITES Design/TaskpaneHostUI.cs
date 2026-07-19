@@ -24,6 +24,8 @@ namespace FRITES_Design
         private string query = string.Empty;
         private Part selectedPart;
         private List<Part> partList;
+        private readonly Dictionary<string, Image> imageCache = new Dictionary<string, Image>();
+        Dictionary<string, int> imageIndexes = new Dictionary<string, int>();
         public TaskpaneHostUI()
         {
             InitializeComponent();
@@ -260,36 +262,51 @@ namespace FRITES_Design
             model.EditRebuild3();
         }
 
+        private Image GetCachedImage(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return null;
+
+            if (imageCache.TryGetValue(path, out Image cached))
+                return cached;
+
+            using (Image img = Image.FromFile(path))
+            {
+                // Clone so the file isn't locked
+                cached = (Image)img.Clone();
+            }
+
+            imageCache[path] = cached;
+            return cached;
+        }
+
         public void update_list()
         {
             List<Part> parts = dataManager.query_parts(query);
+            
             partList = parts;
 
             listView1.BeginUpdate();
-
             listView1.Items.Clear();
-            imageList1.Images.Clear();
+
 
             foreach (Part part in parts)
             {
                 int imageIndex = -1;
 
-                try
+                if (!string.IsNullOrEmpty(part.ThumbnailLink))
                 {
-                    if (File.Exists(part.ImageLink))
+                    if (!imageIndexes.TryGetValue(part.ThumbnailLink, out imageIndex))
                     {
-                        using (Image image = Image.FromFile(part.ImageLink))
-                        {
-                            // Clone the image so the file isn't locked
-                            imageList1.Images.Add((Image)image.Clone());
-                        }
+                        Image image = GetCachedImage(part.ThumbnailLink);
 
-                        imageIndex = imageList1.Images.Count - 1;
+                        if (image != null)
+                        {
+                            imageList1.Images.Add(image);
+                            imageIndex = imageList1.Images.Count - 1;
+                            imageIndexes[part.ThumbnailLink] = imageIndex;
+                        }
                     }
-                }
-                catch
-                {
-                    // Ignore image load failures
                 }
 
                 ListViewItem item = new ListViewItem(part.Name);
@@ -365,21 +382,18 @@ namespace FRITES_Design
             if (!File.Exists(part.ImageLink))
                 return;
 
-            using (var temp = Image.FromFile(part.ImageLink))
+            Image img = GetCachedImage(part.ImageLink);
+            
+            if (img != null)
             {
-                Image img = (Image)temp.Clone();
-
-                preview.SetData(
-                    img,
-                    part.Name,
-                    part.Sku);
+                preview.SetData((Image)img.Clone(), part.Name, part.Sku);
             }
 
             Rectangle bounds = item.Bounds;
 
-            // Bottom-left corner of the item, converted to screen coordinates
+            // convert to screen coordinates
             Point location = listView1.PointToScreen(
-                new Point(bounds.Left, bounds.Bottom + 2));
+                new Point(bounds.Left - preview.Width - 2, bounds.Top + (bounds.Height - preview.Height) / 2));
 
             preview.Location = location;
             preview.Show();

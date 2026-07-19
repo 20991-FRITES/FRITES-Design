@@ -14,5 +14,6 @@ namespace FRITES_Design
         public string StepLink { get; set; }
         public string Manufacturer { get; set; }
         public string ImageLink { get; set; }
+        public string ThumbnailLink { get; set; }  // 48x48
     }
 }

@@ -193,6 +193,11 @@
     <Compile Include="PreviewForm.Designer.cs">
       <DependentUpon>PreviewForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
     <Compile Include="TaskpaneHostUI.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -209,6 +214,10 @@
     <EmbeddedResource Include="PreviewForm.resx">
       <DependentUpon>PreviewForm.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
     <EmbeddedResource Include="TaskpaneHostUI.resx">
       <DependentUpon>TaskpaneHostUI.cs</DependentUpon>
     </EmbeddedResource>
@@ -217,6 +226,9 @@
     <Content Include="logo-small.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <None Include="Resources\4992718_32.png" />
+    <None Include="Resources\Downloadwebsettings_10413.png" />
+    <None Include="Resources\4992718.png" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
