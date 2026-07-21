@@ -87,14 +87,42 @@ namespace FRITES_Design
 
             JsonNode root = JsonNode.Parse(json);
 
-            int total = CountParts(root);
+            // Build category tree and collect all parts
+            var parts = new List<Part>();
+            ImportTree(root, null, parts);
+
+            int total = parts.Count;
             int completed = 0;
 
-            await ImportNode(root, null, total, progress, () =>
+            var semaphore = new SemaphoreSlim(8); // Try 8 first
+            var tasks = new List<Task>();
+
+            foreach (var part in parts)
             {
-                int done = Interlocked.Increment(ref completed);
-                progress?.Report(done * 100 / total);
-            });
+                await semaphore.WaitAsync();
+
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ProcessPartAsync(part);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
+                        add_part(part);
+                    }
+                    finally
+                    {
+                        int done = Interlocked.Increment(ref completed);
+                        progress?.Report(done * 100 / total);
+
+                        semaphore.Release();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
         }
 
         private int CountParts(JsonNode node)
@@ -113,16 +141,13 @@ namespace FRITES_Design
             return count;
         }
 
-        private async Task ImportNode(
-            JsonNode node,
-            int? parentCategoryId,
-            int total,
-            IProgress<int> progress,
-            Action partCompleted)
+        private void ImportTree(
+    JsonNode node,
+    int? parentCategoryId,
+    List<Part> parts)
         {
             int? currentCategoryId = parentCategoryId;
 
-            // Category
             if (node["sku"] == null)
             {
                 currentCategoryId = add_category(
@@ -131,42 +156,23 @@ namespace FRITES_Design
             }
             else
             {
-                Part part = new Part
+                parts.Add(new Part
                 {
                     Name = node["title"]?.ToString() ?? "",
-                    Sku = node["sku"].ToString(),
+                    Sku = node["sku"]?.ToString(),
                     Manufacturer = "goBILDA",
                     StepLink = $"https://www.gobilda.com/content/step_files/{node["sku"]}.zip",
                     ImageLink = node["image_url"]?.ToString(),
                     CategoryId = currentCategoryId ?? 0
-                };
-
-                try
-                {
-                    await ProcessPartAsync(part);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex);
-
-                    // Still insert the part without an image
-                    add_part(part);
-                }
-
-                partCompleted();
+                });
             }
 
             if (node["children"] is JsonArray children)
             {
-                foreach (JsonNode child in children)
+                foreach (var child in children)
                 {
                     if (child != null)
-                        await ImportNode(
-                            child,
-                            currentCategoryId,
-                            total,
-                            progress,
-                            partCompleted);
+                        ImportTree(child, currentCategoryId, parts);
                 }
             }
         }
@@ -202,7 +208,7 @@ namespace FRITES_Design
             return bitmap;
         }
 
-        private async Task<(string, string)> DownloadImageAsync(string imageUrl, string sku)
+        private async Task<(string imagePath, string thumbPath)> DownloadImageAsync(string imageUrl, string sku)
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
@@ -213,46 +219,44 @@ namespace FRITES_Design
             Directory.CreateDirectory(thumbDir);
 
             string extension = Path.GetExtension(new Uri(imageUrl).AbsolutePath);
-            if (string.IsNullOrEmpty(extension))
+            if (string.IsNullOrWhiteSpace(extension))
                 extension = ".jpg";
 
             string imagePath = Path.Combine(imageDir, $"{sku}{extension}");
             string thumbPath = Path.Combine(thumbDir, $"{sku}{extension}");
 
+            // Already downloaded
             if (File.Exists(imagePath) && File.Exists(thumbPath))
                 return (imagePath, thumbPath);
 
-            await imageLimiter.WaitAsync();
-
             try
             {
-                if (!File.Exists(imagePath) || !File.Exists(thumbPath))
+                using (var stream = await httpClient.GetStreamAsync(imageUrl))
+                using (var original = Image.FromStream(stream))
+                using (var resized = ResizeImage(original, 400, 400))
+                using (var thumb = ResizeImage(original, 64, 64))
                 {
-                    try
-                    {
-                        byte[] data = await httpClient.GetByteArrayAsync(imageUrl);
-
-                        var ms = new MemoryStream(data);
-                        var original = Image.FromStream(ms);
-
-                        var resized = ResizeImage(original, 400, 400);
-                        resized.Save(imagePath);
-
-                        var thumb = ResizeImage(original, 64, 64);
-                        thumb.Save(thumbPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"FAILED: {imageUrl}");
-                        Debug.WriteLine(ex);
-
-                        throw;
-                    }
+                    resized.Save(imagePath);
+                    thumb.Save(thumbPath);
                 }
             }
-            finally
+            catch (Exception ex)
             {
-                imageLimiter.Release();
+                Debug.WriteLine($"Failed to download image: {imageUrl}");
+                Debug.WriteLine(ex);
+
+                // Clean up partially written files
+                try
+                {
+                    if (File.Exists(imagePath))
+                        File.Delete(imagePath);
+
+                    if (File.Exists(thumbPath))
+                        File.Delete(thumbPath);
+                }
+                catch { }
+
+                throw;
             }
 
             return (imagePath, thumbPath);

@@ -19,8 +19,6 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace FRITES_Design
 {
-
-
     [ProgId(TaskpaneIntegration.SWTASKPANE_PROGID)]
     public partial class TaskpaneHostUI : UserControl
     {
@@ -37,6 +35,9 @@ namespace FRITES_Design
         private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, string lParam);
 
         private const int EM_SETCUEBANNER = 0x1501;
+
+        public string PendingVirtualComponent { get; private set; }
+        public Part PendingVirtualComponentPart { get; private set; }
 
         public TaskpaneHostUI()
         {
@@ -99,7 +100,7 @@ namespace FRITES_Design
 
                 if (x is Part p)
                 {
-                    if (!imageList1.Images.ContainsKey(p.Sku))
+                    if (!imageList1.Images.ContainsKey(p.Sku) && File.Exists(p.ThumbnailLink))
                     {
                         imageList1.Images.Add(p.Sku, Image.FromFile(p.ThumbnailLink));
                     }
@@ -288,12 +289,13 @@ namespace FRITES_Design
                     finally
                     {
                         loading.Close();
+
+                        RefreshTree();
                     }
                 };
 
                 loading.ShowDialog(this);
             }
-
         }
 
         private PreviewForm preview = new PreviewForm();
@@ -514,6 +516,7 @@ namespace FRITES_Design
                     finally
                     {
                         loading.Close();
+
                     }
                 };
 
@@ -521,12 +524,20 @@ namespace FRITES_Design
             }
         }
 
+        private AssemblyDoc _dragAssembly;
+
+
         private void treeListView1_ItemDrag(object sender, ItemDragEventArgs e)
         {
-            if (selectedPart == null)
-            {
+            ModelDoc2 model = (ModelDoc2)SwApp.ActiveDoc;
+
+            if (model == null ||
+                model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
                 return;
-            }
+
+            _dragAssembly = (AssemblyDoc)model;
+            _dragAssembly.FileDropPostNotify += OnFileDropPostNotify;
+
 
             string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
 
@@ -534,19 +545,72 @@ namespace FRITES_Design
 
             string partDir = Path.Combine(stepDir, selectedPart.Sku);
 
-            if (!Directory.Exists(partDir)) {
+            if (!Directory.Exists(partDir))
+            {
                 return;
             }
 
             string file = Path.Combine(partDir, selectedPart.Sku + ".SLDPRT");
 
+            PendingVirtualComponent = file;
+            PendingVirtualComponentPart = selectedPart;
+
             var data = new DataObject();
             data.SetData(DataFormats.FileDrop, new[] { file });
 
+
             DragDropEffects result = DoDragDrop(data, DragDropEffects.Copy);
 
-            Debug.WriteLine(result);
         }
+
+        private int OnFileDropPostNotify()
+        {
+
+            if (_dragAssembly == null || string.IsNullOrEmpty(PendingVirtualComponent))
+                return 0;
+
+            object[] components = (object[])_dragAssembly.GetComponents(false);
+
+            foreach (Component2 comp in components)
+            {
+                if (string.Equals(
+                comp.GetPathName(),
+                PendingVirtualComponent,
+                StringComparison.OrdinalIgnoreCase))
+                {
+                    bool success = comp.MakeVirtual2(true);
+                    comp.Name2 = PendingVirtualComponentPart.Sku;
+                    ModelDoc2 model = (ModelDoc2)comp.GetModelDoc2();
+                    CustomPropertyManager props =
+                            model.Extension.CustomPropertyManager[""];
+
+                    props.Set2("Part Number", PendingVirtualComponentPart.Sku);
+                    props.Set2("Description", PendingVirtualComponentPart.Name);
+                    comp.ComponentReference = PendingVirtualComponentPart.Sku;
+
+                    //props.Set2("Vendor", PendingVirtualComponentPart.Vendor); TODO: Add Vendor property to Part class and database
+                    break;
+                }
+            }
+
+            this.BeginInvoke(new Action(() =>
+            {
+                if (_dragAssembly != null)
+                {
+                    _dragAssembly.FileDropPostNotify -= OnFileDropPostNotify;
+                    _dragAssembly = null;
+                }
+
+                PendingVirtualComponent = null;
+                PendingVirtualComponentPart = null;
+            }));
+
+
+            return 0;
+        }
+
+
+
     }
 
 
