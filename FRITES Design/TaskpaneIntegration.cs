@@ -65,7 +65,8 @@ namespace FRITES_Design
             mTaskpaneHost.SwApp = mSolidWorksApplication;
             mTaskpaneHost.dataManager = mDataManager;
 
-            mTaskpaneHost.update_list();
+            //mTaskpaneHost.UpdateList();
+            mTaskpaneHost.RefreshTree();
         }
 
         private void UnloadUI()

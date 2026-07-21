@@ -50,7 +50,7 @@
             // 
             // partName
             // 
-            this.partName.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.partName.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.partName.Location = new System.Drawing.Point(257, 9);
             this.partName.Name = "partName";
             this.partName.Size = new System.Drawing.Size(455, 184);
@@ -60,7 +60,7 @@
             // 
             // partSku
             // 
-            this.partSku.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.partSku.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.partSku.Location = new System.Drawing.Point(257, 206);
             this.partSku.Name = "partSku";
             this.partSku.Size = new System.Drawing.Size(455, 46);

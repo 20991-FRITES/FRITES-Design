@@ -1,4 +1,6 @@
-﻿using SolidWorks.Interop.sldworks;
+﻿using BrightIdeasSoftware;
+using FRITES_Design.Properties;
+using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using System;
 using System.Collections.Generic;
@@ -12,20 +14,30 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
+
 
 namespace FRITES_Design
 {
+
+
     [ProgId(TaskpaneIntegration.SWTASKPANE_PROGID)]
     public partial class TaskpaneHostUI : UserControl
     {
         public SldWorks SwApp { get; set; }
         public DataManager dataManager { get; set; }
 
-        private string query = string.Empty;
         private Part selectedPart;
-        private List<Part> partList;
         private readonly Dictionary<string, Image> imageCache = new Dictionary<string, Image>();
-        Dictionary<string, int> imageIndexes = new Dictionary<string, int>();
+        private bool searching = false;
+
+
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, string lParam);
+
+        private const int EM_SETCUEBANNER = 0x1501;
+
         public TaskpaneHostUI()
         {
             InitializeComponent();
@@ -33,60 +45,113 @@ namespace FRITES_Design
 
         private void TaskpaneHostUI_Load(object sender, EventArgs e)
         {
-            insertButton.Enabled = false;
-
             // Required for some .NET Framework projects
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            SendMessage(searchTextBox.Handle, EM_SETCUEBANNER, 0, "Search...");
 
-            listView1.View = System.Windows.Forms.View.Details;
-            listView1.UseCompatibleStateImageBehavior = false;
+            imageList1.Images.Add("folder", Properties.Resources.folder);
+            imageList1.Images.Add("check", Properties.Resources.check);
 
-            imageList1.ImageSize = new Size(48, 48);
-            listView1.SmallImageList = imageList1;
+            treeListView1.ChildrenGetter = x =>
+            {
+                if (x is Category c)
+                {
+                    if (!searching)
+                    {
+                        if (!c.IsLoaded)
+                        {
+                            c.Categories.AddRange(dataManager.GetChildCategories(c.Id));
+                            c.Parts.AddRange(dataManager.GetParts(c.Id));
+
+                            c.IsLoaded = true;
+                        }
+                    }
+                    return c.Categories.Cast<object>()
+                                       .Concat(c.Parts);
+                }
+
+                return null;
+            };
+
+            treeListView1.CanExpandGetter = x =>
+            {
+                if (x is Category c)
+                    return dataManager.DoesCategoryHaveChildren(c.Id);
+
+                return false;
+            };
+
+            PartName.AspectGetter = x =>
+            {
+                if (x is Category c)
+                    return c.Name;
+
+                if (x is Part p)
+                    return p.Name;
+
+                return "";
+            };
+
+            PartName.ImageGetter = x =>
+            {
+                if (x is Category)
+                    return "folder";
+
+                if (x is Part p)
+                {
+                    if (!imageList1.Images.ContainsKey(p.Sku))
+                    {
+                        imageList1.Images.Add(p.Sku, Image.FromFile(p.ThumbnailLink));
+                    }
+
+                    return p.Sku;
+                }
+
+                return null;
+            };
+
+            SKU.AspectGetter = x =>
+            {
+                if (x is Part p)
+                    return p.Sku;
+
+                return "";
+            };
+
+            downloaded.AspectGetter = x =>
+            {
+                return "";
+            };
+
+            downloaded.ImageGetter = x =>
+            {
+                if (x is Part p)
+                    // Check if the file has been downloaded
+                    if (Directory.Exists(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "FRITES Design", "Step", p.Sku)))
+                        return "check";
+
+                return "";
+            };
         }
 
-        private void searchBar_TextChanged(object sender, EventArgs e)
+        public void RefreshTree()
         {
-            query = searchBar.Text;
-            update_list();
+            var roots = dataManager.GetRootCategories();
+
+            treeListView1.SetObjects(roots);
         }
 
-        private async void insertButton_Click(object sender, EventArgs e)
+        private async Task DownloadPart(Part part, IProgress<int> progress)
         {
-            ModelDoc2 model = (ModelDoc2)SwApp.ActiveDoc;
-
-            if (model == null)
-            {
-                MessageBox.Show("No document is open.");
-                return;
-            }
-
-            if (model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
-            {
-                MessageBox.Show("The active document is not an assembly.");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(model.GetPathName()))
-            {
-                MessageBox.Show("Please save the assembly before inserting a component.");
-                return;
-            }
-
-            AssemblyDoc assembly = (AssemblyDoc)model;
+            progress?.Report(0);
 
             string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-
             string stepDir = Path.Combine(appData, "FRITES Design", "Step");
 
             Directory.CreateDirectory(stepDir);
 
-            string partDir = Path.Combine(stepDir, selectedPart.Sku);
+            string partDir = Path.Combine(stepDir, part.Sku);
 
-            // Every document opened between here and the "finally" below (STEP import,
-            // and the preload before AddComponent5) stays hidden -- only the SolidWorks
-            // application window itself remains visible/untouched. A STEP file can import
-            // as either a part or an assembly, so both types are covered.
             SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
             SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
 
@@ -94,18 +159,22 @@ namespace FRITES_Design
 
             try
             {
-                localPartPath = Path.Combine(partDir, selectedPart.Sku + ".sldprt");
+                progress?.Report(5);
+
+                localPartPath = Path.Combine(partDir, part.Sku + ".sldprt");
 
                 if (!File.Exists(localPartPath))
                 {
                     Directory.CreateDirectory(partDir);
 
-                    Uri uri = new Uri(selectedPart.StepLink);
+                    Uri uri = new Uri(part.StepLink);
                     string zipFileName = Path.GetFileName(uri.LocalPath);
                     string zipPath = Path.Combine(stepDir, zipFileName);
 
                     try
                     {
+                        progress?.Report(10);
+
                         using (HttpClient client = new HttpClient())
                         using (Stream stream = await client.GetStreamAsync(uri))
                         using (FileStream file = File.Create(zipPath))
@@ -113,9 +182,12 @@ namespace FRITES_Design
                             await stream.CopyToAsync(file);
                         }
 
+                        progress?.Report(40);
+
                         ZipFile.ExtractToDirectory(zipPath, partDir);
 
-                        // Find the STEP file
+                        progress?.Report(55);
+
                         string stepFile = Directory
                             .EnumerateFiles(partDir, "*.step", SearchOption.AllDirectories)
                             .Concat(Directory.EnumerateFiles(partDir, "*.stp", SearchOption.AllDirectories))
@@ -124,59 +196,40 @@ namespace FRITES_Design
                         if (stepFile == null)
                             throw new FileNotFoundException("No STEP file found in the archive.");
 
-                        // STEP files need the dedicated import pipeline (LoadFile4 + ImportStepData),
-                        // not OpenDoc6 -- OpenDoc6 has no repair/diagnosis hook and fails outright
-                        // on files that need it (swFileRequiresRepairError).
+                        progress?.Report(65);
+
                         ImportStepData swImportStepData = (ImportStepData)SwApp.GetImportFileData(stepFile);
                         swImportStepData.MapConfigurationData = true;
 
                         int loadErrors = 0;
-                        object loadedDoc = SwApp.LoadFile4(stepFile, "r", swImportStepData, ref loadErrors);
-                        ModelDoc2 stepDoc = (ModelDoc2)loadedDoc;
+                        ModelDoc2 stepDoc = (ModelDoc2)SwApp.LoadFile4(stepFile, "r", swImportStepData, ref loadErrors);
 
                         if (stepDoc == null)
-                        {
                             throw new Exception($"Failed to open STEP file. Error: {loadErrors}");
-                        }
 
-                        if (stepDoc.GetType() != (int)swDocumentTypes_e.swDocPART)
-                        {
-                            SwApp.CloseDoc(stepDoc.GetTitle());
-                            throw new Exception("STEP file did not import as a part.");
-                        }
+                        progress?.Report(80);
 
-                        string savePath = Path.Combine(partDir, selectedPart.Sku + ".sldprt");
+                        string savePath = Path.Combine(partDir, part.Sku + ".sldprt");
 
                         ModelDocExtension ext = stepDoc.Extension;
 
                         int saveErrors = 0;
                         int saveWarnings = 0;
 
-                        AdvancedSaveAsOptions adv =
-                            (AdvancedSaveAsOptions)ext.GetAdvancedSaveAsOptions(0);
-
-                        // Save referenced components too
-                        adv.SaveAllAsCopy = false;
-
-
-                        bool saveSuccess = ext.SaveAs3(
+                        bool saveSuccess = ext.SaveAs(
                             savePath,
                             (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
                             (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
                             null,
-                            adv,
                             ref saveErrors,
                             ref saveWarnings);
 
-                        // Close by the doc's own title, not the source STEP filename --
-                        // SolidWorks assigns the in-memory title based on the part name,
-                        // which usually doesn't match the STEP filename.
                         SwApp.CloseDoc(stepDoc.GetTitle());
 
                         if (!saveSuccess)
-                        {
-                            throw new Exception($"Failed to save part. Errors: {saveErrors}, Warnings: {saveWarnings}");
-                        }
+                            throw new Exception($"Failed to save part. Errors: {saveErrors}");
+
+                        progress?.Report(90);
 
                         localPartPath = savePath;
                     }
@@ -187,16 +240,11 @@ namespace FRITES_Design
                     }
                 }
 
-                if (!File.Exists(localPartPath))
-                {
-                    throw new Exception($"Expected saved component not found at: {localPartPath}");
-                }
+                progress?.Report(95);
 
-                // AddComponent5 only reliably works from automation code if the component is
-                // already resident in the session -- unlike the interactive Insert Component
-                // flow, it does not load the model from disk itself when called this way.
                 int preloadErrors = 0;
                 int preloadWarnings = 0;
+
                 ModelDoc2 preloadDoc = SwApp.OpenDoc6(
                     localPartPath,
                     (int)swDocumentTypes_e.swDocPART,
@@ -206,122 +254,17 @@ namespace FRITES_Design
                     ref preloadWarnings);
 
                 if (preloadDoc == null)
-                {
-                    throw new Exception($"Failed to preload component before adding to assembly. Error: {preloadErrors}");
-                }
+                    throw new Exception($"Failed to preload component. Error: {preloadErrors}");
+
+                progress?.Report(100);
             }
             finally
             {
-                // Reset visibility so anything the user opens themselves afterward behaves normally
                 SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
                 SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
             }
-
-            // Make sure the assembly is the active document before adding to it
-            int activateErrors = 0;
-            SwApp.ActivateDoc3(
-                model.GetTitle(),
-                false,
-                (int)swRebuildOnActivation_e.swUserDecision,
-                ref activateErrors);
-
-            Component2 comp = assembly.AddComponent5(
-                localPartPath,
-                (int)swAddComponentConfigOptions_e.swAddComponentConfigOptions_CurrentSelectedConfig,
-                "",
-                false,
-                "",
-                0, 0, 0);
-
-            if (comp == null)
-            {
-                throw new Exception("AddComponent5 failed to add the component.");
-            }
-
-            // Embed the component directly into the assembly file -- since catalog parts are
-            // never revised in place (only new SKUs are created), there's no benefit to keeping
-            // an external file link, and this keeps the assembly shareable as a single file.
-            bool madeVirtual = comp.MakeVirtual2(true);
-
-            if (!madeVirtual)
-            {
-                throw new Exception("Failed to make component virtual.");
-            }
-
-            ModelDoc2 doc = (ModelDoc2)comp.GetModelDoc2();
-            doc.SetTitle2(selectedPart.Sku);
-
-            CustomPropertyManager props =
-                doc.Extension.CustomPropertyManager[""];
-
-            // For BOM
-            props.Set2("Description", selectedPart.Name);
-            props.Set2("Part Number", selectedPart.Sku);
-
-            comp.Name2 = selectedPart.Sku;
-            model.EditRebuild3();
         }
 
-        private Image GetCachedImage(string path)
-        {
-            if (string.IsNullOrEmpty(path) || !File.Exists(path))
-                return null;
-
-            if (imageCache.TryGetValue(path, out Image cached))
-                return cached;
-
-            using (Image img = Image.FromFile(path))
-            {
-                // Clone so the file isn't locked
-                cached = (Image)img.Clone();
-            }
-
-            imageCache[path] = cached;
-            return cached;
-        }
-
-        public void update_list()
-        {
-            List<Part> parts = dataManager.query_parts(query);
-            
-            partList = parts;
-
-            listView1.BeginUpdate();
-            listView1.Items.Clear();
-
-
-            foreach (Part part in parts)
-            {
-                int imageIndex = -1;
-
-                if (!string.IsNullOrEmpty(part.ThumbnailLink))
-                {
-                    if (!imageIndexes.TryGetValue(part.ThumbnailLink, out imageIndex))
-                    {
-                        Image image = GetCachedImage(part.ThumbnailLink);
-
-                        if (image != null)
-                        {
-                            imageList1.Images.Add(image);
-                            imageIndex = imageList1.Images.Count - 1;
-                            imageIndexes[part.ThumbnailLink] = imageIndex;
-                        }
-                    }
-                }
-
-                ListViewItem item = new ListViewItem(part.Name);
-
-                if (imageIndex >= 0)
-                    item.ImageIndex = imageIndex;
-
-                item.SubItems.Add(part.Sku);
-                item.Tag = part;
-
-                listView1.Items.Add(item);
-            }
-
-            listView1.EndUpdate();
-        }
 
         private void updateButton_Click(object sender, EventArgs e)
         {
@@ -351,70 +294,260 @@ namespace FRITES_Design
                 loading.ShowDialog(this);
             }
 
-            update_list();
         }
 
-        private void resultList_SelectedIndexChanged(object sender, EventArgs e)
+        private PreviewForm preview = new PreviewForm();
+
+        private object lastHoveredModel = null;
+
+        private void treeListView1_MouseMove(object sender, MouseEventArgs e)
         {
-            insertButton.Enabled = listView1.SelectedItems.Count > 0;
+            var hitTest = treeListView1.OlvHitTest(e.Location.X, e.Location.Y);
 
-            if (listView1.SelectedItems.Count == 0)
-            {
-                selectedPart = null;
-                return;
-            }
-
-            selectedPart = (Part)listView1.SelectedItems[0].Tag;
-        }
-
-        PreviewForm preview = new PreviewForm();
-        private ListViewItem hoveredItem = null;
-
-        private void listView1_MouseLeave(object sender, EventArgs e)
-        {
-            preview.Hide();
-        }
-
-        private void ShowPreview(ListViewItem item)
-        {
-            Part part = (Part)item.Tag;
-
-            if (!File.Exists(part.ImageLink))
+            if (hitTest.RowObject == lastHoveredModel)
                 return;
 
-            Image img = GetCachedImage(part.ImageLink);
-            
-            if (img != null)
-            {
-                preview.SetData((Image)img.Clone(), part.Name, part.Sku);
-            }
+            lastHoveredModel = hitTest.RowObject;
 
-            Rectangle bounds = item.Bounds;
-
-            // convert to screen coordinates
-            Point location = listView1.PointToScreen(
-                new Point(bounds.Left - preview.Width - 2, bounds.Top + (bounds.Height - preview.Height) / 2));
-
-            preview.Location = location;
-            preview.Show();
-        }
-
-        private void listView1_MouseMove(object sender, MouseEventArgs e)
-        {
-            ListViewItem item = listView1.GetItemAt(e.X, e.Y);
-
-            if (item == hoveredItem)
-                return; // Still over the same item
-
-            hoveredItem = item;
-
-            if (item == null)
+            if (hitTest.RowObject == null)
             {
                 preview.Hide();
                 return;
             }
+            if (hitTest.RowObject is Part part)
+            {
+                if (hitTest.Item != null)
+                {
+                    ShowPreview(hitTest.Item, part);
+                }
+                else
+                {
+                    preview.Hide();
+                }
+            }
+            else
+            {
+                preview.Hide();
+            }
+        }
 
-            ShowPreview(item);
+        private void ShowPreview(ListViewItem item, Part part)
+        {
+            if (string.IsNullOrEmpty(part.ImageLink)) return;
+
+            Image previewImage = null;
+
+            // 1. Check memory cache first (Instantaneous)
+            if (imageCache.ContainsKey(part.ImageLink))
+            {
+                previewImage = imageCache[part.ImageLink];
+            }
+            else if (File.Exists(part.ImageLink))
+            {
+                try
+                {
+                    // Load asynchronously/non-locking via memory stream to keep it lightweight
+                    byte[] bytes = File.ReadAllBytes(part.ImageLink);
+                    using (MemoryStream ms = new MemoryStream(bytes))
+                    {
+                        Image loadedImg = Image.FromStream(ms);
+                        // Cache a clone so we can safely manage memory
+                        previewImage = (Image)loadedImg.Clone();
+                        imageCache[part.ImageLink] = previewImage;
+                    }
+                }
+                catch
+                {
+                    return; // Handle corrupt files gracefully
+                }
+            }
+
+            if (previewImage == null) return;
+
+            // 2. Set the data on your preview form
+            preview.SetData(previewImage, part.Name, part.Sku);
+
+            // 3. Position and display
+            Rectangle bounds = item.Bounds;
+            Point location = treeListView1.PointToScreen(
+                new Point(bounds.Left - preview.Width - 2,
+                          bounds.Top + (bounds.Height - preview.Height) / 2));
+
+            preview.Location = location;
+
+            if (!preview.Visible)
+            {
+                preview.Show();
+            }
+        }
+
+        private void treeListView1_MouseLeave(object sender, EventArgs e)
+        {
+            Debug.WriteLine("[PreviewLog] MouseLeave fired. Hiding preview.");
+            preview.Hide();
+            lastHoveredModel = null;
+        }
+
+        private void refreshButton_Click(object sender, EventArgs e)
+        {
+            RefreshTree();
+        }
+
+        private void searchTextBox_TextChanged(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(searchTextBox.Text))
+            {
+                searching = false;
+                RefreshTree();
+            }
+            else
+            {
+                searching = true;
+
+                var results = dataManager.query_parts(searchTextBox.Text);
+                var roots = BuildSearchTree(results);
+
+                treeListView1.SetObjects(roots);
+                treeListView1.ExpandAll();
+            }
+        }
+
+        private List<Category> BuildSearchTree(List<Part> parts)
+        {
+            var roots = new List<Category>();
+
+            foreach (var part in parts)
+            {
+                // Build the path from the part's category to the root
+                var path = new Stack<Category>();
+
+                Category current = dataManager.GetCategoryById(part.CategoryId);
+
+                while (current != null)
+                {
+                    path.Push(current);
+
+                    if (current.ParentId == null)
+                        break;
+
+                    current = dataManager.GetCategoryById(current.ParentId.Value);
+                }
+
+                // Walk down the path, creating folders as needed
+                List<Category> currentLevel = roots;
+                Category currentNode = null;
+
+                while (path.Count > 0)
+                {
+                    var cat = path.Pop();
+
+                    var existing = currentLevel.FirstOrDefault(c => c.Id == cat.Id);
+
+                    if (existing == null)
+                    {
+                        existing = new Category
+                        {
+                            Id = cat.Id,
+                            Name = cat.Name,
+                            ParentId = cat.ParentId
+                        };
+
+                        currentLevel.Add(existing);
+                    }
+
+                    currentNode = existing;
+                    currentLevel = existing.Categories;
+                }
+
+                // Finally add the matching part
+                currentNode.Parts.Add(part);
+            }
+
+            return roots;
+        }
+
+        private void treeListView1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            selectedPart = treeListView1.SelectedObject as Part;
+        }
+
+        private async void downloadButton_ClickAsync(object sender, EventArgs e)
+        {
+            var selectedParts = treeListView1.SelectedObjects
+                                 .OfType<Part>()
+                                 .ToList();
+
+            if (!selectedParts.Any())
+            {
+                MessageBox.Show("Select one or more parts before clicking download.");
+                return;
+            }
+
+            using (var loading = new LoadingForm())
+            {
+                loading.SetLabel("Downloading and converting parts...");
+
+                loading.Shown += async (_, __) =>
+                {
+                    try
+                    {
+                        int total = selectedParts.Count;
+
+                        for (int i = 0; i < total; i++)
+                        {
+                            Part part = selectedParts[i];
+
+                            var progress = new Progress<int>(p =>
+                            {
+                                // p is 0-100 for this part
+                                double overall = (i + p / 100.0) / total;
+                                loading.SetProgress((int)(overall * 100));
+                            });
+
+                            await DownloadPart(part, progress);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.ToString());
+                    }
+                    finally
+                    {
+                        loading.Close();
+                    }
+                };
+
+                loading.ShowDialog(this);
+            }
+        }
+
+        private void treeListView1_ItemDrag(object sender, ItemDragEventArgs e)
+        {
+            if (selectedPart == null)
+            {
+                return;
+            }
+
+            string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+
+            string stepDir = Path.Combine(appData, "FRITES Design", "Step");
+
+            string partDir = Path.Combine(stepDir, selectedPart.Sku);
+
+            if (!Directory.Exists(partDir)) {
+                return;
+            }
+
+            string file = Path.Combine(partDir, selectedPart.Sku + ".SLDPRT");
+
+            var data = new DataObject();
+            data.SetData(DataFormats.FileDrop, new[] { file });
+
+            DragDropEffects result = DoDragDrop(data, DragDropEffects.Copy);
+
+            Debug.WriteLine(result);
         }
     }
+
+
 }

@@ -15,5 +15,6 @@ namespace FRITES_Design
         public string Manufacturer { get; set; }
         public string ImageLink { get; set; }
         public string ThumbnailLink { get; set; }  // 48x48
+        public int CategoryId { get; set; }
     }
 }

@@ -22,6 +22,15 @@ namespace FRITES_Design
 
         public void SetProgress(int value)
         {
+            if (value < 0)
+            {
+                value = 0;
+            } 
+            else if (value > 100)
+            {
+                value = 100;
+            }
+
             if (InvokeRequired)
             {
                 Invoke(new MethodInvoker(delegate
@@ -33,6 +42,11 @@ namespace FRITES_Design
             {
                 progressBar1.Value = value;
             }
+        }
+
+        public void SetLabel(string label)
+        {
+            label1.Text = label;
         }
 
         private void LoadingForm_Load(object sender, EventArgs e)
