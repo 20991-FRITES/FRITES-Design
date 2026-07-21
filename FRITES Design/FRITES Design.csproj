@@ -190,6 +190,7 @@
       <DependentUpon>LoadingForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Part.cs" />
+    <Compile Include="PartDownloader.cs" />
     <Compile Include="PartNode.cs" />
     <Compile Include="PreviewForm.cs">
       <SubType>Form</SubType>

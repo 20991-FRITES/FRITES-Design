@@ -29,8 +29,6 @@ namespace FRITES_Design
         private readonly Dictionary<string, Image> imageCache = new Dictionary<string, Image>();
         private bool searching = false;
 
-
-
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, string lParam);
 
@@ -38,6 +36,12 @@ namespace FRITES_Design
 
         public string PendingVirtualComponent { get; private set; }
         public Part PendingVirtualComponentPart { get; private set; }
+
+        private PreviewForm preview = new PreviewForm();
+
+        private object lastHoveredModel = null;
+
+        private AssemblyDoc _dragAssembly;
 
         public TaskpaneHostUI()
         {
@@ -53,86 +57,83 @@ namespace FRITES_Design
             imageList1.Images.Add("folder", Properties.Resources.folder);
             imageList1.Images.Add("check", Properties.Resources.check);
 
-            treeListView1.ChildrenGetter = x =>
+            treeListView1.ChildrenGetter = GetTreeChildren;
+            treeListView1.CanExpandGetter = CanExpandTree;
+            PartName.AspectGetter = GetPartNameAspect;
+            PartName.ImageGetter = GetPartNameImage;
+            SKU.AspectGetter = GetSkuAspect;
+            downloaded.AspectGetter = GetDownloadedAspect;
+            downloaded.ImageGetter = GetDownloadedImage;
+        }
+
+        private System.Collections.IEnumerable GetTreeChildren(object x)
+        {
+            if (x is Category c)
             {
-                if (x is Category c)
+                if (!searching)
                 {
-                    if (!searching)
+                    if (!c.IsLoaded)
                     {
-                        if (!c.IsLoaded)
-                        {
-                            c.Categories.AddRange(dataManager.GetChildCategories(c.Id));
-                            c.Parts.AddRange(dataManager.GetParts(c.Id));
-
-                            c.IsLoaded = true;
-                        }
+                        c.Categories.AddRange(dataManager.GetChildCategories(c.Id));
+                        c.Parts.AddRange(dataManager.GetParts(c.Id));
+                        c.IsLoaded = true;
                     }
-                    return c.Categories.Cast<object>()
-                                       .Concat(c.Parts);
                 }
+                return c.Categories.Cast<object>().Concat(c.Parts);
+            }
+            return null;
+        }
 
-                return null;
-            };
+        private bool CanExpandTree(object x)
+        {
+            if (x is Category c)
+                return dataManager.DoesCategoryHaveChildren(c.Id);
+            return false;
+        }
 
-            treeListView1.CanExpandGetter = x =>
+        private object GetPartNameAspect(object x)
+        {
+            if (x is Category c) return c.Name;
+            if (x is Part p) return p.Name;
+            return "";
+        }
+
+        private object GetPartNameImage(object x)
+        {
+            if (x is Category)
+                return "folder";
+
+            if (x is Part p)
             {
-                if (x is Category c)
-                    return dataManager.DoesCategoryHaveChildren(c.Id);
-
-                return false;
-            };
-
-            PartName.AspectGetter = x =>
-            {
-                if (x is Category c)
-                    return c.Name;
-
-                if (x is Part p)
-                    return p.Name;
-
-                return "";
-            };
-
-            PartName.ImageGetter = x =>
-            {
-                if (x is Category)
-                    return "folder";
-
-                if (x is Part p)
+                if (!imageList1.Images.ContainsKey(p.Sku) && File.Exists(p.ThumbnailLink))
                 {
-                    if (!imageList1.Images.ContainsKey(p.Sku) && File.Exists(p.ThumbnailLink))
-                    {
-                        imageList1.Images.Add(p.Sku, Image.FromFile(p.ThumbnailLink));
-                    }
-
-                    return p.Sku;
+                    imageList1.Images.Add(p.Sku, Image.FromFile(p.ThumbnailLink));
                 }
+                return p.Sku;
+            }
+            return null;
+        }
 
-                return null;
-            };
+        private object GetSkuAspect(object x)
+        {
+            if (x is Part p) return p.Sku;
+            return "";
+        }
 
-            SKU.AspectGetter = x =>
+        private object GetDownloadedAspect(object x)
+        {
+            return "";
+        }
+
+        private object GetDownloadedImage(object x)
+        {
+            if (x is Part p)
             {
-                if (x is Part p)
-                    return p.Sku;
-
-                return "";
-            };
-
-            downloaded.AspectGetter = x =>
-            {
-                return "";
-            };
-
-            downloaded.ImageGetter = x =>
-            {
-                if (x is Part p)
-                    // Check if the file has been downloaded
-                    if (Directory.Exists(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "FRITES Design", "Step", p.Sku)))
-                        return "check";
-
-                return "";
-            };
+                string path = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "FRITES Design", "Step", p.Sku);
+                if (Directory.Exists(path))
+                    return "check";
+            }
+            return "";
         }
 
         public void RefreshTree()
@@ -142,165 +143,33 @@ namespace FRITES_Design
             treeListView1.SetObjects(roots);
         }
 
-        private async Task DownloadPart(Part part, IProgress<int> progress)
-        {
-            progress?.Report(0);
-
-            string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-            string stepDir = Path.Combine(appData, "FRITES Design", "Step");
-
-            Directory.CreateDirectory(stepDir);
-
-            string partDir = Path.Combine(stepDir, part.Sku);
-
-            SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
-            SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
-
-            string localPartPath;
-
-            try
-            {
-                progress?.Report(5);
-
-                localPartPath = Path.Combine(partDir, part.Sku + ".sldprt");
-
-                if (!File.Exists(localPartPath))
-                {
-                    Directory.CreateDirectory(partDir);
-
-                    Uri uri = new Uri(part.StepLink);
-                    string zipFileName = Path.GetFileName(uri.LocalPath);
-                    string zipPath = Path.Combine(stepDir, zipFileName);
-
-                    try
-                    {
-                        progress?.Report(10);
-
-                        using (HttpClient client = new HttpClient())
-                        using (Stream stream = await client.GetStreamAsync(uri))
-                        using (FileStream file = File.Create(zipPath))
-                        {
-                            await stream.CopyToAsync(file);
-                        }
-
-                        progress?.Report(40);
-
-                        ZipFile.ExtractToDirectory(zipPath, partDir);
-
-                        progress?.Report(55);
-
-                        string stepFile = Directory
-                            .EnumerateFiles(partDir, "*.step", SearchOption.AllDirectories)
-                            .Concat(Directory.EnumerateFiles(partDir, "*.stp", SearchOption.AllDirectories))
-                            .FirstOrDefault();
-
-                        if (stepFile == null)
-                            throw new FileNotFoundException("No STEP file found in the archive.");
-
-                        progress?.Report(65);
-
-                        ImportStepData swImportStepData = (ImportStepData)SwApp.GetImportFileData(stepFile);
-                        swImportStepData.MapConfigurationData = true;
-
-                        int loadErrors = 0;
-                        ModelDoc2 stepDoc = (ModelDoc2)SwApp.LoadFile4(stepFile, "r", swImportStepData, ref loadErrors);
-
-                        if (stepDoc == null)
-                            throw new Exception($"Failed to open STEP file. Error: {loadErrors}");
-
-                        progress?.Report(80);
-
-                        string savePath = Path.Combine(partDir, part.Sku + ".sldprt");
-
-                        ModelDocExtension ext = stepDoc.Extension;
-
-                        int saveErrors = 0;
-                        int saveWarnings = 0;
-
-                        bool saveSuccess = ext.SaveAs(
-                            savePath,
-                            (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
-                            (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
-                            null,
-                            ref saveErrors,
-                            ref saveWarnings);
-
-                        SwApp.CloseDoc(stepDoc.GetTitle());
-
-                        if (!saveSuccess)
-                            throw new Exception($"Failed to save part. Errors: {saveErrors}");
-
-                        progress?.Report(90);
-
-                        localPartPath = savePath;
-                    }
-                    finally
-                    {
-                        if (File.Exists(zipPath))
-                            File.Delete(zipPath);
-                    }
-                }
-
-                progress?.Report(95);
-
-                int preloadErrors = 0;
-                int preloadWarnings = 0;
-
-                ModelDoc2 preloadDoc = SwApp.OpenDoc6(
-                    localPartPath,
-                    (int)swDocumentTypes_e.swDocPART,
-                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
-                    "",
-                    ref preloadErrors,
-                    ref preloadWarnings);
-
-                if (preloadDoc == null)
-                    throw new Exception($"Failed to preload component. Error: {preloadErrors}");
-
-                progress?.Report(100);
-            }
-            finally
-            {
-                SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
-                SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
-            }
-        }
-
+        
 
         private void updateButton_Click(object sender, EventArgs e)
         {
-            using (var loading = new LoadingForm())
-            {
-                loading.Shown += async (_, __) =>
-                {
-                    try
-                    {
-                        var progress = new Progress<int>(value =>
-                        {
-                            loading.SetProgress(value);
-                        });
-
-                        await dataManager.update_parts(progress);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show(ex.ToString());
-                    }
-                    finally
-                    {
-                        loading.Close();
-
-                        RefreshTree();
-                    }
-                };
-
-                loading.ShowDialog(this);
-            }
+            var loading = new LoadingForm();
+            loading.Shown += async (_, __) => await OnUpdateLoadingShown(loading);
+            loading.ShowDialog(this);
         }
 
-        private PreviewForm preview = new PreviewForm();
-
-        private object lastHoveredModel = null;
+        private async Task OnUpdateLoadingShown(LoadingForm loading)
+        {
+            try
+            {
+                var progress = new Progress<int>(loading.SetProgress);
+                await dataManager.UpdateParts(progress);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+            finally
+            {
+                loading.Close();
+                RefreshTree();
+                loading.Dispose();
+            }
+        }
 
         private void treeListView1_MouseMove(object sender, MouseEventArgs e)
         {
@@ -406,14 +275,13 @@ namespace FRITES_Design
             {
                 searching = true;
 
-                var results = dataManager.query_parts(searchTextBox.Text);
+                var results = dataManager.QueryParts(searchTextBox.Text);
                 var roots = BuildSearchTree(results);
 
                 treeListView1.SetObjects(roots);
                 treeListView1.ExpandAll();
             }
         }
-
         private List<Category> BuildSearchTree(List<Part> parts)
         {
             var roots = new List<Category>();
@@ -473,11 +341,9 @@ namespace FRITES_Design
             selectedPart = treeListView1.SelectedObject as Part;
         }
 
-        private async void downloadButton_ClickAsync(object sender, EventArgs e)
+        private void downloadButton_ClickAsync(object sender, EventArgs e)
         {
-            var selectedParts = treeListView1.SelectedObjects
-                                 .OfType<Part>()
-                                 .ToList();
+            var selectedParts = treeListView1.SelectedObjects.OfType<Part>().ToList();
 
             if (!selectedParts.Any())
             {
@@ -485,47 +351,38 @@ namespace FRITES_Design
                 return;
             }
 
-            using (var loading = new LoadingForm())
-            {
-                loading.SetLabel("Downloading and converting parts...");
-
-                loading.Shown += async (_, __) =>
-                {
-                    try
-                    {
-                        int total = selectedParts.Count;
-
-                        for (int i = 0; i < total; i++)
-                        {
-                            Part part = selectedParts[i];
-
-                            var progress = new Progress<int>(p =>
-                            {
-                                // p is 0-100 for this part
-                                double overall = (i + p / 100.0) / total;
-                                loading.SetProgress((int)(overall * 100));
-                            });
-
-                            await DownloadPart(part, progress);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show(ex.ToString());
-                    }
-                    finally
-                    {
-                        loading.Close();
-
-                    }
-                };
-
-                loading.ShowDialog(this);
-            }
+            var loading = new LoadingForm();
+            loading.SetLabel("Downloading and converting parts...");
+            loading.Shown += async (_, __) => await OnDownloadLoadingShown(loading, selectedParts);
+            loading.ShowDialog(this);
         }
 
-        private AssemblyDoc _dragAssembly;
-
+        private async Task OnDownloadLoadingShown(LoadingForm loading, List<Part> selectedParts)
+        {
+            try
+            {
+                int total = selectedParts.Count;
+                for (int i = 0; i < total; i++)
+                {
+                    Part part = selectedParts[i];
+                    var progress = new Progress<int>(p =>
+                    {
+                        double overall = (i + p / 100.0) / total;
+                        loading.SetProgress((int)(overall * 100));
+                    });
+                    await PartDownloader.DownloadPart(SwApp, part, progress);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+            finally
+            {
+                loading.Close();
+                loading.Dispose();
+            }
+        }
 
         private void treeListView1_ItemDrag(object sender, ItemDragEventArgs e)
         {
@@ -608,9 +465,6 @@ namespace FRITES_Design
 
             return 0;
         }
-
-
-
     }
 
 

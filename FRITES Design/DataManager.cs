@@ -1,11 +1,9 @@
-﻿using SolidWorks.Interop.dsgnchk;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -17,71 +15,69 @@ namespace FRITES_Design
 {
     public class DataManager
     {
-        string dbPath;
+        string DBPath;
         static readonly HttpClient httpClient = new HttpClient();
 
         private const string PART_LIST_ENDPOINT =
     "https://gist.githubusercontent.com/Blue25GD/7732b771724a335f63114d55bbeab7ad/raw/96c0f7512330727260348eb07e64691d175d3a54/parts";
 
-        private readonly SemaphoreSlim imageLimiter = new SemaphoreSlim(8); // Max simultaneous image downloads
         public DataManager()
         {
-            dbPath = Path.Combine(
+            DBPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "FRITES Design",
                 "data.db");
-
         }
 
-        private SQLiteConnection get_conn()
+        private SQLiteConnection GetDBConnection()
         {
-            return new SQLiteConnection($"Data Source={dbPath};");
+            return new SQLiteConnection($"Data Source={DBPath};");
         }
 
-        public void setup_db()
+        public void SetupDB()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+            Directory.CreateDirectory(Path.GetDirectoryName(DBPath));
 
-            var connection = get_conn();
-            connection.Open();
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
 
-            var command = connection.CreateCommand();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS parts
+                    (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        sku TEXT NOT NULL,
+                        step_link TEXT NOT NULL,
+                        manufacturer TEXT,
+                        image_link TEXT,
+                        thumbnail_link TEXT,
+                        category_id INTEGER,
+                        FOREIGN KEY(category_id) REFERENCES categories(Id)
+                    );";
 
-            command.CommandText = @"
-            CREATE TABLE IF NOT EXISTS parts
-            (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                sku TEXT NOT NULL,
-                step_link TEXT NOT NULL,
-                manufacturer TEXT,
-                image_link TEXT,
-                thumbnail_link TEXT,
-                category_id INTEGER,
-                FOREIGN KEY(category_id) REFERENCES categories(Id)
-            );";
+                    command.ExecuteNonQuery();
 
+                    command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_parts_sku
+                    ON parts(sku);";
 
+                    command.ExecuteNonQuery();
 
-            command.ExecuteNonQuery();
+                    command.CommandText = @"CREATE TABLE IF NOT EXISTS categories
+                    (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        parent_id INTEGER
+                    );";
 
-            command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_parts_sku
-            ON parts(sku);";
-
-            command.ExecuteNonQuery();
-
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS categories
-            (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                parent_id INTEGER
-            );";
-
-            command.ExecuteNonQuery();
-            connection.Close();
+                    command.ExecuteNonQuery();
+                }
+            }
         }
 
-        public async Task update_parts(IProgress<int> progress = null)
+        public async Task UpdateParts(IProgress<int> progress = null)
         {
             string json = await httpClient.GetStringAsync(PART_LIST_ENDPOINT);
 
@@ -94,8 +90,10 @@ namespace FRITES_Design
             int total = parts.Count;
             int completed = 0;
 
-            var semaphore = new SemaphoreSlim(8); // Try 8 first
+            var semaphore = new SemaphoreSlim(16); // Increased concurrency for faster image downloads
             var tasks = new List<Task>();
+            var partsBatch = new List<Part>();
+            const int batchSize = 20;
 
             foreach (var part in parts)
             {
@@ -110,10 +108,21 @@ namespace FRITES_Design
                     catch (Exception ex)
                     {
                         Debug.WriteLine(ex);
-                        add_part(part);
                     }
                     finally
                     {
+                        lock (partsBatch)
+                        {
+                            partsBatch.Add(part);
+
+                            if (partsBatch.Count >= batchSize)
+                            {
+                                var batch = new List<Part>(partsBatch);
+                                partsBatch.Clear();
+                                AddPartsBatch(batch);
+                            }
+                        }
+
                         int done = Interlocked.Increment(ref completed);
                         progress?.Report(done * 100 / total);
 
@@ -123,6 +132,15 @@ namespace FRITES_Design
             }
 
             await Task.WhenAll(tasks);
+
+            // Insert remaining parts
+            lock (partsBatch)
+            {
+                if (partsBatch.Count > 0)
+                {
+                    AddPartsBatch(partsBatch);
+                }
+            }
         }
 
         private int CountParts(JsonNode node)
@@ -150,7 +168,7 @@ namespace FRITES_Design
 
             if (node["sku"] == null)
             {
-                currentCategoryId = add_category(
+                currentCategoryId = AddCategoryFast(
                     node["title"]?.ToString() ?? "",
                     parentCategoryId);
             }
@@ -184,220 +202,219 @@ namespace FRITES_Design
 
             if (!string.IsNullOrWhiteSpace(part.ImageLink))
             {
-                var (imagePath, thumbPath) = await DownloadImageAsync(part.ImageLink, part.Sku);
+                var (imagePath, thumbPath) = await PartDownloader.DownloadImageAsync(part.ImageLink, part.Sku);
                 part.ImageLink = imagePath;
                 part.ThumbnailLink = thumbPath;
             }
-
-            add_part(part);
         }
 
-        private static Bitmap ResizeImage(Image image, int width, int height)
+
+
+        public List<Part> QueryParts(string q, int max_results = 25)
         {
-            var bitmap = new Bitmap(width, height);
-
-            using (var g = Graphics.FromImage(bitmap))
-            {
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-
-                g.DrawImage(image, 0, 0, width, height);
-            }
-
-            return bitmap;
-        }
-
-        private async Task<(string imagePath, string thumbPath)> DownloadImageAsync(string imageUrl, string sku)
-        {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-
-            string imageDir = Path.Combine(appData, "FRITES Design", "Images");
-            string thumbDir = Path.Combine(imageDir, "Thumbs");
-
-            Directory.CreateDirectory(imageDir);
-            Directory.CreateDirectory(thumbDir);
-
-            string extension = Path.GetExtension(new Uri(imageUrl).AbsolutePath);
-            if (string.IsNullOrWhiteSpace(extension))
-                extension = ".jpg";
-
-            string imagePath = Path.Combine(imageDir, $"{sku}{extension}");
-            string thumbPath = Path.Combine(thumbDir, $"{sku}{extension}");
-
-            // Already downloaded
-            if (File.Exists(imagePath) && File.Exists(thumbPath))
-                return (imagePath, thumbPath);
-
-            try
-            {
-                using (var stream = await httpClient.GetStreamAsync(imageUrl))
-                using (var original = Image.FromStream(stream))
-                using (var resized = ResizeImage(original, 400, 400))
-                using (var thumb = ResizeImage(original, 64, 64))
-                {
-                    resized.Save(imagePath);
-                    thumb.Save(thumbPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to download image: {imageUrl}");
-                Debug.WriteLine(ex);
-
-                // Clean up partially written files
-                try
-                {
-                    if (File.Exists(imagePath))
-                        File.Delete(imagePath);
-
-                    if (File.Exists(thumbPath))
-                        File.Delete(thumbPath);
-                }
-                catch { }
-
-                throw;
-            }
-
-            return (imagePath, thumbPath);
-        }
-
-        public List<Part> query_parts(string q, int max_results = 25)
-        {
-            var connection = get_conn();
-            connection.Open();
-
-            var command = connection.CreateCommand();
-
-            var words = q
-                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-            var sb = new StringBuilder(@"
-            SELECT *
-            FROM parts");
-
-            if (words.Length > 0)
-            {
-                sb.Append("\nWHERE ");
-
-                for (int i = 0; i < words.Length; i++)
-                {
-                    if (i > 0)
-                        sb.Append(" AND ");
-
-                    sb.Append($"(sku LIKE @w{i} OR name LIKE @w{i})");
-                }
-            }
-
-            sb.Append(@"
-            ORDER BY sku
-            LIMIT @limit;");
-
-            command.CommandText = sb.ToString();
-
-            for (int i = 0; i < words.Length; i++)
-            {
-                command.Parameters.AddWithValue($"@w{i}", "%" + words[i] + "%");
-            }
-
-            command.Parameters.AddWithValue("@limit", max_results);
-
             var parts = new List<Part>();
 
-            using (var reader = command.ExecuteReader())
+            using (var connection = GetDBConnection())
             {
-                while (reader.Read())
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
                 {
-                    parts.Add(new Part
+                    var words = q.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                    var sb = new StringBuilder(@"
+                    SELECT *
+                    FROM parts");
+
+                    if (words.Length > 0)
                     {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        Sku = reader.GetString(2),
-                        StepLink = reader.GetString(3),
-                        Manufacturer = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        ImageLink = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        ThumbnailLink = reader.IsDBNull(6) ? null : reader.GetString(6),
-                        CategoryId = reader.GetInt32(7),
-                    });
+                        sb.Append("\nWHERE ");
+
+                        for (int i = 0; i < words.Length; i++)
+                        {
+                            if (i > 0)
+                                sb.Append(" AND ");
+
+                            sb.Append($"(sku LIKE @w{i} OR name LIKE @w{i})");
+                        }
+                    }
+
+                    sb.Append(@"
+                    ORDER BY sku
+                    LIMIT @limit;");
+
+                    command.CommandText = sb.ToString();
+
+                    for (int i = 0; i < words.Length; i++)
+                    {
+                        command.Parameters.AddWithValue($"@w{i}", "%" + words[i] + "%");
+                    }
+
+                    command.Parameters.AddWithValue("@limit", max_results);
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            parts.Add(MapPart(reader));
+                        }
+                    }
                 }
             }
-
-            connection.Close();
 
             return parts;
         }
 
-        private void add_part(Part part)
+        private void AddPart(Part part)
         {
-            var connection = get_conn();
-            connection.Open();
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
 
-            var command = connection.CreateCommand();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"INSERT OR IGNORE INTO parts
+                    (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id)
+                    VALUES
+                    (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id)";
 
-            command.CommandText = @"INSERT OR IGNORE INTO parts
-(name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id)
-VALUES
-(@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id)
-";
+                    command.Parameters.AddWithValue("@name", part.Name);
+                    command.Parameters.AddWithValue("@sku", part.Sku);
+                    command.Parameters.AddWithValue("@step_link", part.StepLink);
+                    command.Parameters.AddWithValue("@manufacturer", part.Manufacturer);
+                    command.Parameters.AddWithValue("@image_link", part.ImageLink);
+                    command.Parameters.AddWithValue("@thumbnail_link", part.ThumbnailLink);
+                    command.Parameters.AddWithValue("@category_id", part.CategoryId);
 
-            command.Parameters.AddWithValue("@name", part.Name);
-            command.Parameters.AddWithValue("@sku", part.Sku);
-            command.Parameters.AddWithValue("@step_link", part.StepLink);
-            command.Parameters.AddWithValue("@manufacturer", part.Manufacturer);
-            command.Parameters.AddWithValue("@image_link", part.ImageLink);
-            command.Parameters.AddWithValue("@thumbnail_link", part.ThumbnailLink);
-            command.Parameters.AddWithValue("@category_id", part.CategoryId);
-
-            command.ExecuteNonQuery();
-
-            connection.Close();
+                    command.ExecuteNonQuery();
+                }
+            }
         }
 
-        private int add_category(string name, int? parentId)
+        private void AddPartsBatch(List<Part> parts)
         {
-            var connection = get_conn();
-            connection.Open();
+            if (parts == null || parts.Count == 0)
+                return;
 
-            var command = connection.CreateCommand();
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
 
-            command.CommandText = @"
-        INSERT INTO categories(name, parent_id)
-        VALUES(@name, @parent);
+                // Optimize SQLite for bulk inserts
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "PRAGMA synchronous = OFF";
+                    command.ExecuteNonQuery();
 
-        SELECT last_insert_rowid();
-    ";
+                    command.CommandText = "PRAGMA journal_mode = WAL";
+                    command.ExecuteNonQuery();
+                }
 
-            command.Parameters.AddWithValue("@name", name);
-            command.Parameters.AddWithValue("@parent", (object)parentId ?? DBNull.Value);
+                using (var transaction = connection.BeginTransaction())
+                {
+                    using (var command = connection.CreateCommand())
+                    {
+                        command.Transaction = transaction;
 
-            return Convert.ToInt32(command.ExecuteScalar());
+                        foreach (var part in parts)
+                        {
+                            command.CommandText = @"INSERT OR IGNORE INTO parts
+                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id)
+                            VALUES
+                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id)";
+
+                            command.Parameters.Clear();
+                            command.Parameters.AddWithValue("@name", part.Name ?? "");
+                            command.Parameters.AddWithValue("@sku", part.Sku ?? "");
+                            command.Parameters.AddWithValue("@step_link", part.StepLink ?? "");
+                            command.Parameters.AddWithValue("@manufacturer", part.Manufacturer ?? "");
+                            command.Parameters.AddWithValue("@image_link", part.ImageLink ?? (object)DBNull.Value);
+                            command.Parameters.AddWithValue("@thumbnail_link", part.ThumbnailLink ?? (object)DBNull.Value);
+                            command.Parameters.AddWithValue("@category_id", part.CategoryId);
+
+                            command.ExecuteNonQuery();
+                        }
+                    }
+
+                    transaction.Commit();
+                }
+
+                // Re-enable synchronous mode for normal operations
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "PRAGMA synchronous = NORMAL";
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        private int AddCategory(string name, int? parentId)
+        {
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                    INSERT INTO categories(name, parent_id)
+                    VALUES(@name, @parent);
+
+                    SELECT last_insert_rowid();";
+
+                    command.Parameters.AddWithValue("@name", name);
+                    command.Parameters.AddWithValue("@parent", (object)parentId ?? DBNull.Value);
+
+                    return Convert.ToInt32(command.ExecuteScalar());
+                }
+            }
+        }
+
+        private int AddCategoryFast(string name, int? parentId)
+        {
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                    INSERT INTO categories(name, parent_id)
+                    VALUES(@name, @parent);
+
+                    SELECT last_insert_rowid();";
+
+                    command.Parameters.AddWithValue("@name", name ?? "");
+                    command.Parameters.AddWithValue("@parent", (object)parentId ?? DBNull.Value);
+
+                    return Convert.ToInt32(command.ExecuteScalar());
+                }
+            }
         }
 
         public List<Category> GetRootCategories()
         {
-            var connection = get_conn();
-            connection.Open();
-
-            var command = connection.CreateCommand();
-
-            command.CommandText = @"
-                SELECT Id, name, parent_id
-                FROM categories
-                WHERE parent_id IS NULL
-                ORDER BY name;";
-
             List<Category> categories = new List<Category>();
 
-            using (var reader = command.ExecuteReader())
+            using (var connection = GetDBConnection())
             {
-                while (reader.Read())
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
                 {
-                    categories.Add(new Category
+                    command.CommandText = @"
+                        SELECT Id, name, parent_id
+                        FROM categories
+                        WHERE parent_id IS NULL
+                        ORDER BY name;";
+
+                    using (var reader = command.ExecuteReader())
                     {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        ParentId = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2)
-                    });
+                        while (reader.Read())
+                        {
+                            categories.Add(MapCategory(reader));
+                        }
+                    }
                 }
             }
 
@@ -406,31 +423,29 @@ VALUES
 
         public List<Category> GetChildCategories(int parentId)
         {
-            var connection = get_conn();
-            connection.Open();
-
-            var command = connection.CreateCommand();
-
-            command.CommandText = @"
-        SELECT Id, name, parent_id
-        FROM categories
-        WHERE parent_id = @parentId
-        ORDER BY name;";
-
-            command.Parameters.AddWithValue("@parentId", parentId);
-
             List<Category> categories = new List<Category>();
 
-            using (var reader = command.ExecuteReader())
+            using (var connection = GetDBConnection())
             {
-                while (reader.Read())
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
                 {
-                    categories.Add(new Category
+                    command.CommandText = @"
+                        SELECT Id, name, parent_id
+                        FROM categories
+                        WHERE parent_id = @parentId
+                        ORDER BY name;";
+
+                    command.Parameters.AddWithValue("@parentId", parentId);
+
+                    using (var reader = command.ExecuteReader())
                     {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        ParentId = reader.GetInt32(2)
-                    });
+                        while (reader.Read())
+                        {
+                            categories.Add(MapCategory(reader));
+                        }
+                    }
                 }
             }
 
@@ -439,36 +454,29 @@ VALUES
 
         public List<Part> GetParts(int categoryId)
         {
-            var connection = get_conn();
-            connection.Open();
-
-            var command = connection.CreateCommand();
-
-            command.CommandText = @"
-        SELECT *
-        FROM parts
-        WHERE category_id = @categoryId
-        ORDER BY sku;";
-
-            command.Parameters.AddWithValue("@categoryId", categoryId);
-
             List<Part> parts = new List<Part>();
 
-            using (var reader = command.ExecuteReader())
+            using (var connection = GetDBConnection())
             {
-                while (reader.Read())
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
                 {
-                    parts.Add(new Part
+                    command.CommandText = @"
+                        SELECT *
+                        FROM parts
+                        WHERE category_id = @categoryId
+                        ORDER BY sku;";
+
+                    command.Parameters.AddWithValue("@categoryId", categoryId);
+
+                    using (var reader = command.ExecuteReader())
                     {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        Sku = reader.GetString(2),
-                        StepLink = reader.GetString(3),
-                        Manufacturer = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        ImageLink = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        ThumbnailLink = reader.IsDBNull(6) ? null : reader.GetString(6),
-                        CategoryId = reader.GetInt32(7)
-                    });
+                        while (reader.Read())
+                        {
+                            parts.Add(MapPart(reader));
+                        }
+                    }
                 }
             }
 
@@ -477,30 +485,26 @@ VALUES
 
         public Category GetCategoryById(int id)
         {
-            using (var connection = get_conn())
+            using (var connection = GetDBConnection())
             {
                 connection.Open();
 
-                var command = connection.CreateCommand();
-
-                command.CommandText = @"
-            SELECT Id, name, parent_id
-            FROM categories
-            WHERE Id = @id;";
-
-                command.Parameters.AddWithValue("@id", id);
-
-                using (var reader = command.ExecuteReader())
+                using (var command = connection.CreateCommand())
                 {
-                    if (!reader.Read())
-                        return null;
+                    command.CommandText = @"
+                        SELECT Id, name, parent_id
+                        FROM categories
+                        WHERE Id = @id;";
 
-                    return new Category
+                    command.Parameters.AddWithValue("@id", id);
+                    
+                    using (var reader = command.ExecuteReader())
                     {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        ParentId = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2)
-                    };
+                        if (!reader.Read())
+                            return null;
+
+                        return MapCategory(reader);
+                    }
                 }
             }
         }
@@ -517,30 +521,56 @@ VALUES
 
         public bool DoesCategoryHaveChildren(int categoryId)
         {
-            using (var connection = get_conn())
+            using (var connection = GetDBConnection())
             {
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                        SELECT
+                            EXISTS(
+                                SELECT 1
+                                FROM categories
+                                WHERE parent_id = @categoryId
+                            )
+                            OR
+                            EXISTS(
+                                SELECT 1
+                                FROM parts
+                                WHERE category_id = @categoryId
+                            );";
 
-                command.CommandText = @"
-            SELECT
-                EXISTS(
-                    SELECT 1
-                    FROM categories
-                    WHERE parent_id = @categoryId
-                )
-                OR
-                EXISTS(
-                    SELECT 1
-                    FROM parts
-                    WHERE category_id = @categoryId
-                );";
+                    command.Parameters.AddWithValue("@categoryId", categoryId);
 
-                command.Parameters.AddWithValue("@categoryId", categoryId);
-
-                return Convert.ToBoolean(command.ExecuteScalar());
+                    return Convert.ToBoolean(command.ExecuteScalar());
+                }
             }
+        }
+
+        private Part MapPart(SQLiteDataReader reader)
+        {
+            return new Part
+            {
+                Id = reader.GetInt32(0),
+                Name = reader.GetString(1),
+                Sku = reader.GetString(2),
+                StepLink = reader.GetString(3),
+                Manufacturer = reader.IsDBNull(4) ? null : reader.GetString(4),
+                ImageLink = reader.IsDBNull(5) ? null : reader.GetString(5),
+                ThumbnailLink = reader.IsDBNull(6) ? null : reader.GetString(6),
+                CategoryId = reader.GetInt32(7)
+            };
+        }
+
+        private Category MapCategory(SQLiteDataReader reader)
+        {
+            return new Category
+            {
+                Id = reader.GetInt32(0),
+                Name = reader.GetString(1),
+                ParentId = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2)
+            };
         }
     }
 }

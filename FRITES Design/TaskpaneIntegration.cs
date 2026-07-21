@@ -41,7 +41,7 @@ namespace FRITES_Design
             var ok = mSolidWorksApplication.SetAddinCallbackInfo2(0, this, Cookie);
 
             mDataManager = new DataManager();
-            mDataManager.setup_db();
+            mDataManager.SetupDB();
 
             LoadUI();
             return true;
