@@ -55,6 +55,7 @@ namespace FRITES_Design
                         image_link TEXT,
                         thumbnail_link TEXT,
                         category_id INTEGER,
+                        product_page_link TEXT,
                         FOREIGN KEY(category_id) REFERENCES categories(Id)
                     );";
 
@@ -181,7 +182,8 @@ namespace FRITES_Design
                     Manufacturer = "goBILDA",
                     StepLink = $"https://www.gobilda.com/content/step_files/{node["sku"]}.zip",
                     ImageLink = node["image_url"]?.ToString(),
-                    CategoryId = currentCategoryId ?? 0
+                    CategoryId = currentCategoryId ?? 0,
+                    ProductPageLink = node["url"]?.ToString()
                 });
             }
 
@@ -265,32 +267,6 @@ namespace FRITES_Design
             return parts;
         }
 
-        private void AddPart(Part part)
-        {
-            using (var connection = GetDBConnection())
-            {
-                connection.Open();
-
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText = @"INSERT OR IGNORE INTO parts
-                    (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id)
-                    VALUES
-                    (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id)";
-
-                    command.Parameters.AddWithValue("@name", part.Name);
-                    command.Parameters.AddWithValue("@sku", part.Sku);
-                    command.Parameters.AddWithValue("@step_link", part.StepLink);
-                    command.Parameters.AddWithValue("@manufacturer", part.Manufacturer);
-                    command.Parameters.AddWithValue("@image_link", part.ImageLink);
-                    command.Parameters.AddWithValue("@thumbnail_link", part.ThumbnailLink);
-                    command.Parameters.AddWithValue("@category_id", part.CategoryId);
-
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
-
         private void AddPartsBatch(List<Part> parts)
         {
             if (parts == null || parts.Count == 0)
@@ -319,9 +295,9 @@ namespace FRITES_Design
                         foreach (var part in parts)
                         {
                             command.CommandText = @"INSERT OR IGNORE INTO parts
-                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id)
+                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link)
                             VALUES
-                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id)";
+                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link)";
 
                             command.Parameters.Clear();
                             command.Parameters.AddWithValue("@name", part.Name ?? "");
@@ -331,6 +307,7 @@ namespace FRITES_Design
                             command.Parameters.AddWithValue("@image_link", part.ImageLink ?? (object)DBNull.Value);
                             command.Parameters.AddWithValue("@thumbnail_link", part.ThumbnailLink ?? (object)DBNull.Value);
                             command.Parameters.AddWithValue("@category_id", part.CategoryId);
+                            command.Parameters.AddWithValue("@product_page_link", part.ProductPageLink ?? (object)DBNull.Value);
 
                             command.ExecuteNonQuery();
                         }
@@ -344,28 +321,6 @@ namespace FRITES_Design
                 {
                     command.CommandText = "PRAGMA synchronous = NORMAL";
                     command.ExecuteNonQuery();
-                }
-            }
-        }
-
-        private int AddCategory(string name, int? parentId)
-        {
-            using (var connection = GetDBConnection())
-            {
-                connection.Open();
-
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText = @"
-                    INSERT INTO categories(name, parent_id)
-                    VALUES(@name, @parent);
-
-                    SELECT last_insert_rowid();";
-
-                    command.Parameters.AddWithValue("@name", name);
-                    command.Parameters.AddWithValue("@parent", (object)parentId ?? DBNull.Value);
-
-                    return Convert.ToInt32(command.ExecuteScalar());
                 }
             }
         }
@@ -559,7 +514,8 @@ namespace FRITES_Design
                 Manufacturer = reader.IsDBNull(4) ? null : reader.GetString(4),
                 ImageLink = reader.IsDBNull(5) ? null : reader.GetString(5),
                 ThumbnailLink = reader.IsDBNull(6) ? null : reader.GetString(6),
-                CategoryId = reader.GetInt32(7)
+                CategoryId = reader.GetInt32(7),
+                ProductPageLink = reader.IsDBNull(8) ? null : reader.GetString(8)
             };
         }
 

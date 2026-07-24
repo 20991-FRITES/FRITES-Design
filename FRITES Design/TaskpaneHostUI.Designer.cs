@@ -32,6 +32,8 @@ namespace FRITES_Design
             this.PartName = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.SKU = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.downloaded = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
+            this.deleteButton = new System.Windows.Forms.ToolStripButton();
+            this.openInBrowserButton = new System.Windows.Forms.ToolStripButton();
             this.toolStrip1.SuspendLayout();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.treeListView1)).BeginInit();
@@ -54,7 +56,9 @@ namespace FRITES_Design
             this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.updatePartListButton,
             this.refreshButton,
-            this.downloadButton});
+            this.downloadButton,
+            this.deleteButton,
+            this.openInBrowserButton});
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(907, 78);
@@ -84,11 +88,12 @@ namespace FRITES_Design
             // 
             // downloadButton
             // 
+            this.downloadButton.AutoSize = false;
             this.downloadButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
             this.downloadButton.Image = ((System.Drawing.Image)(resources.GetObject("downloadButton.Image")));
             this.downloadButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.downloadButton.Name = "downloadButton";
-            this.downloadButton.Size = new System.Drawing.Size(46, 72);
+            this.downloadButton.Size = new System.Drawing.Size(60, 60);
             this.downloadButton.Text = "Download";
             this.downloadButton.Click += new System.EventHandler(this.downloadButton_ClickAsync);
             // 
@@ -167,6 +172,28 @@ namespace FRITES_Design
             this.downloaded.Text = "Downloaded";
             this.downloaded.Width = 90;
             // 
+            // deleteButton
+            // 
+            this.deleteButton.AutoSize = false;
+            this.deleteButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.deleteButton.Image = ((System.Drawing.Image)(resources.GetObject("deleteButton.Image")));
+            this.deleteButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.deleteButton.Name = "deleteButton";
+            this.deleteButton.Size = new System.Drawing.Size(60, 60);
+            this.deleteButton.Text = "Delete";
+            this.deleteButton.Click += new System.EventHandler(this.deleteButton_Click);
+            // 
+            // openInBrowserButton
+            // 
+            this.openInBrowserButton.AutoSize = false;
+            this.openInBrowserButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.openInBrowserButton.Image = ((System.Drawing.Image)(resources.GetObject("openInBrowserButton.Image")));
+            this.openInBrowserButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.openInBrowserButton.Name = "openInBrowserButton";
+            this.openInBrowserButton.Size = new System.Drawing.Size(60, 60);
+            this.openInBrowserButton.Text = "Open in browser";
+            this.openInBrowserButton.Click += new System.EventHandler(this.openInBrowserButton_Click);
+            // 
             // TaskpaneHostUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(14F, 29F);
@@ -202,5 +229,7 @@ namespace FRITES_Design
         private BrightIdeasSoftware.OLVColumn PartName;
         private BrightIdeasSoftware.OLVColumn downloaded;
         private ToolStripButton downloadButton;
+        private ToolStripButton deleteButton;
+        private ToolStripButton openInBrowserButton;
     }
 }

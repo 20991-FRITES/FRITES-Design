@@ -465,7 +465,59 @@ namespace FRITES_Design
 
             return 0;
         }
+
+        private void deleteButton_Click(object sender, EventArgs e)
+        {
+            var selectedParts = treeListView1.SelectedObjects.OfType<Part>().ToList();
+
+            if (!selectedParts.Any())
+            {
+                MessageBox.Show("Select one or more parts before clicking delete.");
+                return;
+            }
+
+            foreach (var part in selectedParts)
+            {
+                string path = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "FRITES Design", "Step", part.Sku);
+                if (Directory.Exists(path))
+                {
+                    try
+                    {
+                        Directory.Delete(path, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Failed to delete part {part.Name} ({part.Sku}): {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private void openInBrowserButton_Click(object sender, EventArgs e)
+        {
+            var selectedParts = treeListView1.SelectedObjects.OfType<Part>().ToList();
+
+            if (!selectedParts.Any())
+            {
+                MessageBox.Show("Select one or more parts before clicking open in browser.");
+                return;
+            }
+
+            foreach (var part in selectedParts)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = part.ProductPageLink,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to open URL {part.ProductPageLink}: {ex.Message}");
+                }
+            }
+        }
     }
-
-
 }

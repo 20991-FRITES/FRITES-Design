@@ -2,6 +2,7 @@
 using SolidWorks.Interop.swpublished;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -58,8 +59,24 @@ namespace FRITES_Design
         #region Load/unload UI
         private void LoadUI()
         {
-            var imagePath = Path.Combine(Path.GetDirectoryName(typeof(TaskpaneIntegration).Assembly.CodeBase).Replace(@"file:\", string.Empty), "logo-small.png");
-            mTaskpaneView = mSolidWorksApplication.CreateTaskpaneView2(imagePath, "FRITES Design");
+            var assemblyFolder = Path.GetDirectoryName(
+    new Uri(typeof(TaskpaneIntegration).Assembly.CodeBase).LocalPath);
+
+            var iconsFolder = Path.Combine(assemblyFolder, "taskpane_icons");
+
+            object imageList = new[]
+            {
+                 Path.Combine(iconsFolder, "icon_20x20.png"),
+                 Path.Combine(iconsFolder, "icon_32x32.png"),
+                 Path.Combine(iconsFolder, "icon_40x40.png"),
+                 Path.Combine(iconsFolder, "icon_64x64.png"),
+                 Path.Combine(iconsFolder, "icon_96x96.png"),
+                 Path.Combine(iconsFolder, "icon_128x128.png")
+            };
+
+            mTaskpaneView = mSolidWorksApplication.CreateTaskpaneView3(
+                imageList,
+                "FRITES Design");
 
             mTaskpaneHost = (TaskpaneHostUI)mTaskpaneView.AddControl(SWTASKPANE_PROGID, string.Empty);
             mTaskpaneHost.SwApp = mSolidWorksApplication;
