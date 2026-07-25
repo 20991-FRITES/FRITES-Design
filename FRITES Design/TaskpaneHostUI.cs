@@ -143,13 +143,63 @@ namespace FRITES_Design
             treeListView1.SetObjects(roots);
         }
 
-        
+        private static string GetLibrarySetupSuppressionPath()
+        {
+            return Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+                "FRITES Design",
+                "LibrarySetupForm.skipped");
+        }
+
+        private static void SuppressLibrarySetupForm()
+        {
+            var path = GetLibrarySetupSuppressionPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, DateTime.UtcNow.ToString("O"));
+        }
+
+        private static bool ShouldShowLibrarySetupForm()
+        {
+            return !File.Exists(GetLibrarySetupSuppressionPath());
+        }
 
         private void updateButton_Click(object sender, EventArgs e)
         {
             var loading = new LoadingForm();
             loading.Shown += async (_, __) => await OnUpdateLoadingShown(loading);
             loading.ShowDialog(this);
+
+            if (ShouldShowLibrarySetupForm())
+            {
+                var setupForm = new LibrarySetupForm();
+                DialogResult result = setupForm.ShowDialog(this);
+
+                if (result != DialogResult.OK)
+                {
+                    SuppressLibrarySetupForm();
+                    return;
+                }
+
+                SuppressLibrarySetupForm();
+
+
+                Stopwatch stopwatch = Stopwatch.StartNew();
+
+                var parts = dataManager.GetCommonlyUsedParts();
+
+                loading = new LoadingForm();
+                loading.SetLabel("Downloading and converting parts...");
+                loading.Shown += async (_, __) => await OnDownloadLoadingShown(loading, parts);
+                loading.ShowDialog(this);
+
+                stopwatch.Stop();
+
+                MessageBox.Show(
+                    $"Library setup completed successfully.\n\nTime taken: {stopwatch.Elapsed}",
+                    "Update Complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
         }
 
         private async Task OnUpdateLoadingShown(LoadingForm loading)
@@ -355,23 +405,37 @@ namespace FRITES_Design
             loading.SetLabel("Downloading and converting parts...");
             loading.Shown += async (_, __) => await OnDownloadLoadingShown(loading, selectedParts);
             loading.ShowDialog(this);
+
         }
 
         private async Task OnDownloadLoadingShown(LoadingForm loading, List<Part> selectedParts)
         {
+            const double AverageSecondsPerPart = 12.0;
+
             try
             {
                 int total = selectedParts.Count;
+
                 for (int i = 0; i < total; i++)
                 {
                     Part part = selectedParts[i];
+
                     var progress = new Progress<int>(p =>
                     {
                         double overall = (i + p / 100.0) / total;
                         loading.SetProgress((int)(overall * 100));
+
+                        // ETA
+                        double remainingParts = (total - i - 1) + (100 - p) / 100.0;
+                        double remainingSeconds = remainingParts * AverageSecondsPerPart;
+
+                        loading.SetETA(TimeSpan.FromSeconds(remainingSeconds));
                     });
+
                     await PartDownloader.DownloadPart(SwApp, part, progress);
                 }
+
+                loading.SetETA(TimeSpan.Zero);
             }
             catch (Exception ex)
             {

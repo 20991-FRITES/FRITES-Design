@@ -11,5 +11,6 @@
         public string ThumbnailLink { get; set; }  // 48x48
         public int CategoryId { get; set; }
         public string ProductPageLink { get; set; }
+        public bool CommonlyUsed { get; set; } = false;
     }
 }

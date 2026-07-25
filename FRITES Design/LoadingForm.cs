@@ -49,6 +49,14 @@ namespace FRITES_Design
             label1.Text = label;
         }
 
+        public void SetETA(TimeSpan eta)
+        {
+            if (eta.TotalHours >= 1)
+                label2.Text = $"Estimated time left: {eta:h\\:mm\\:ss}";
+            else
+                label2.Text = $"Estimated time left: {eta:m\\:ss}";
+        }
+
         private void LoadingForm_Load(object sender, EventArgs e)
         {
 

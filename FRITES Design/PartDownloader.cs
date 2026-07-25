@@ -9,13 +9,19 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FRITES_Design
 {
     public class PartDownloader
     {
-        private static readonly HttpClient _httpClient = new HttpClient();
+        private const int DownloadTimeoutSeconds = 180;
+        private const int DownloadRetryCount = 3;
+        private static readonly HttpClient _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(DownloadTimeoutSeconds)
+        };
 
         public static async Task DownloadPart(SldWorks SwApp, Part part, IProgress<int> progress)
         {
@@ -31,50 +37,66 @@ namespace FRITES_Design
             SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
             SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
 
-            string localPartPath;
+            string localPartPath = Path.Combine(partDir, part.Sku + ".sldprt");
 
             try
             {
                 progress?.Report(5);
-
-                localPartPath = Path.Combine(partDir, part.Sku + ".sldprt");
 
                 if (!File.Exists(localPartPath))
                 {
                     Directory.CreateDirectory(partDir);
 
                     Uri uri = new Uri(part.StepLink);
-                    string zipFileName = Path.GetFileName(uri.LocalPath);
-                    string zipPath = Path.Combine(stepDir, zipFileName);
+                    string fileName = Path.GetFileName(uri.LocalPath);
+                    string downloadPath = Path.Combine(stepDir, fileName);
 
                     try
                     {
                         progress?.Report(10);
 
-                        using (Stream stream = await _httpClient.GetStreamAsync(uri))
-                        using (FileStream file = File.Create(zipPath))
+                        bool downloaded = await TryDownloadFileAsync(uri, downloadPath);
+                        if (!downloaded)
                         {
-                            await stream.CopyToAsync(file);
+                            Debug.WriteLine($"Skipping part {part.Sku}: failed to download STEP file after {DownloadRetryCount} attempts.");
+                            return;
                         }
 
                         progress?.Report(40);
 
-                        ZipFile.ExtractToDirectory(zipPath, partDir);
+                        string stepFile;
+                        string extension = Path.GetExtension(downloadPath).ToLowerInvariant();
+
+                        if (extension == ".zip")
+                        {
+                            ZipFile.ExtractToDirectory(downloadPath, partDir);
+
+                            stepFile = Directory
+                                .EnumerateFiles(partDir, "*.step", SearchOption.AllDirectories)
+                                .Concat(Directory.EnumerateFiles(partDir, "*.stp", SearchOption.AllDirectories))
+                                .FirstOrDefault();
+
+                            if (stepFile == null)
+                                throw new FileNotFoundException("No STEP file found in the archive.");
+                        }
+                        else if (extension == ".step" || extension == ".stp")
+                        {
+                            stepFile = Path.Combine(partDir, Path.GetFileName(downloadPath));
+
+                            if (!string.Equals(downloadPath, stepFile, StringComparison.OrdinalIgnoreCase))
+                                File.Copy(downloadPath, stepFile, true);
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"Unsupported downloaded file type: {extension}");
+                        }
 
                         progress?.Report(55);
 
-                        string stepFile = Directory
-                            .EnumerateFiles(partDir, "*.step", SearchOption.AllDirectories)
-                            .Concat(Directory.EnumerateFiles(partDir, "*.stp", SearchOption.AllDirectories))
-                            .FirstOrDefault();
-
-                        if (stepFile == null)
-                            throw new FileNotFoundException("No STEP file found in the archive.");
-
-                        progress?.Report(65);
-
                         ImportStepData swImportStepData = (ImportStepData)SwApp.GetImportFileData(stepFile);
                         swImportStepData.MapConfigurationData = true;
+
+                        progress?.Report(65);
 
                         int loadErrors = 0;
                         ModelDoc2 stepDoc = (ModelDoc2)SwApp.LoadFile4(stepFile, "r", swImportStepData, ref loadErrors);
@@ -110,8 +132,16 @@ namespace FRITES_Design
                     }
                     finally
                     {
-                        if (File.Exists(zipPath))
-                            File.Delete(zipPath);
+                        if (File.Exists(downloadPath))
+                        {
+                            try
+                            {
+                                File.Delete(downloadPath);
+                            }
+                            catch
+                            {
+                            }
+                        }
                     }
                 }
 
@@ -133,11 +163,57 @@ namespace FRITES_Design
 
                 progress?.Report(100);
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Skipping part {part.Sku} after download/load failure.");
+                Debug.WriteLine(ex);
+            }
             finally
             {
                 SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
                 SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
             }
+        }
+
+        private static async Task<bool> TryDownloadFileAsync(Uri uri, string destinationPath)
+        {
+            for (int attempt = 1; attempt <= DownloadRetryCount; attempt++)
+            {
+                try
+                {
+                    using (HttpResponseMessage response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead))
+                    {
+                        response.EnsureSuccessStatusCode();
+
+                        using (Stream stream = await response.Content.ReadAsStreamAsync())
+                        using (FileStream file = File.Create(destinationPath))
+                        {
+                            await stream.CopyToAsync(file);
+                        }
+                    }
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Download attempt {attempt} failed for {uri}");
+                    Debug.WriteLine(ex);
+
+                    if (File.Exists(destinationPath))
+                    {
+                        try
+                        {
+                            File.Delete(destinationPath);
+                        }
+                        catch { }
+                    }
+
+                    if (attempt < DownloadRetryCount)
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                }
+            }
+
+            return false;
         }
 
         private static Bitmap ResizeImage(Image image, int width, int height)
@@ -173,42 +249,51 @@ namespace FRITES_Design
             string imagePath = Path.Combine(imageDir, $"{sku}{extension}");
             string thumbPath = Path.Combine(thumbDir, $"{sku}{extension}");
 
-            // Already downloaded
             if (File.Exists(imagePath) && File.Exists(thumbPath))
                 return (imagePath, thumbPath);
 
-            try
+            for (int attempt = 1; attempt <= DownloadRetryCount; attempt++)
             {
-                using (var stream = await _httpClient.GetStreamAsync(imageUrl))
-                using (var original = Image.FromStream(stream))
-                using (var resized = ResizeImage(original, 400, 400))
-                using (var thumb = ResizeImage(original, 64, 64))
-                {
-                    resized.Save(imagePath);
-                    thumb.Save(thumbPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to download image: {imageUrl}");
-                Debug.WriteLine(ex);
-
-                // Clean up partially written files
                 try
                 {
-                    if (File.Exists(imagePath))
-                        File.Delete(imagePath);
+                    using (var response = await _httpClient.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead))
+                    {
+                        response.EnsureSuccessStatusCode();
 
-                    if (File.Exists(thumbPath))
-                        File.Delete(thumbPath);
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var original = Image.FromStream(stream))
+                        using (var resized = ResizeImage(original, 400, 400))
+                        using (var thumb = ResizeImage(original, 64, 64))
+                        {
+                            resized.Save(imagePath);
+                            thumb.Save(thumbPath);
+                        }
+                    }
+
+                    return (imagePath, thumbPath);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to download image attempt {attempt}: {imageUrl}");
+                    Debug.WriteLine(ex);
 
-                throw;
+                    try
+                    {
+                        if (File.Exists(imagePath))
+                            File.Delete(imagePath);
+
+                        if (File.Exists(thumbPath))
+                            File.Delete(thumbPath);
+                    }
+                    catch { }
+
+                    if (attempt < DownloadRetryCount)
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                }
             }
 
-            return (imagePath, thumbPath);
+            Debug.WriteLine($"Skipping image download after {DownloadRetryCount} attempts: {imageUrl}");
+            return (string.Empty, string.Empty);
         }
-
     }
 }

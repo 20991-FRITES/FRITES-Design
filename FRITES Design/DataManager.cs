@@ -18,8 +18,10 @@ namespace FRITES_Design
         string DBPath;
         static readonly HttpClient httpClient = new HttpClient();
 
+    //    private const string PART_LIST_ENDPOINT =
+    //"https://gist.githubusercontent.com/Blue25GD/7732b771724a335f63114d55bbeab7ad/raw/96c0f7512330727260348eb07e64691d175d3a54/parts";
         private const string PART_LIST_ENDPOINT =
-    "https://gist.githubusercontent.com/Blue25GD/7732b771724a335f63114d55bbeab7ad/raw/96c0f7512330727260348eb07e64691d175d3a54/parts";
+    "https://gist.githubusercontent.com/Blue25GD/7732b771724a335f63114d55bbeab7ad/raw/1cd2b83924398f6566b009b2301928452e88663a/parts";
 
         public DataManager()
         {
@@ -56,6 +58,7 @@ namespace FRITES_Design
                         thumbnail_link TEXT,
                         category_id INTEGER,
                         product_page_link TEXT,
+                        commonly_used INTEGER DEFAULT 0,    
                         FOREIGN KEY(category_id) REFERENCES categories(Id)
                     );";
 
@@ -173,17 +176,19 @@ namespace FRITES_Design
                     node["title"]?.ToString() ?? "",
                     parentCategoryId);
             }
-            else
+            else if (!DoesPartExist(node["sku"]?.ToString()))
             {
                 parts.Add(new Part
                 {
                     Name = node["title"]?.ToString() ?? "",
                     Sku = node["sku"]?.ToString(),
                     Manufacturer = "goBILDA",
-                    StepLink = $"https://www.gobilda.com/content/step_files/{node["sku"]}.zip",
+                    StepLink = node["step_file"]?.ToString()
+    ?? $"https://www.gobilda.com/content/step_files/{node["sku"]}.zip",
                     ImageLink = node["image_url"]?.ToString(),
                     CategoryId = currentCategoryId ?? 0,
-                    ProductPageLink = node["url"]?.ToString()
+                    ProductPageLink = node["url"]?.ToString(),
+                    CommonlyUsed = node["commonly_used"]?.GetValue<bool>() ?? false
                 });
             }
 
@@ -193,6 +198,23 @@ namespace FRITES_Design
                 {
                     if (child != null)
                         ImportTree(child, currentCategoryId, parts);
+                }
+            }
+        }
+
+        private bool DoesPartExist(string v)
+        {
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                    SELECT COUNT(*)
+                    FROM parts
+                    WHERE sku = @sku;";
+                    command.Parameters.AddWithValue("@sku", v);
+                    return Convert.ToInt32(command.ExecuteScalar()) > 0;
                 }
             }
         }
@@ -295,9 +317,9 @@ namespace FRITES_Design
                         foreach (var part in parts)
                         {
                             command.CommandText = @"INSERT OR IGNORE INTO parts
-                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link)
+                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link, commonly_used)
                             VALUES
-                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link)";
+                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link,@commonly_used)";
 
                             command.Parameters.Clear();
                             command.Parameters.AddWithValue("@name", part.Name ?? "");
@@ -308,6 +330,8 @@ namespace FRITES_Design
                             command.Parameters.AddWithValue("@thumbnail_link", part.ThumbnailLink ?? (object)DBNull.Value);
                             command.Parameters.AddWithValue("@category_id", part.CategoryId);
                             command.Parameters.AddWithValue("@product_page_link", part.ProductPageLink ?? (object)DBNull.Value);
+                            command.Parameters.AddWithValue("@commonly_used", part.CommonlyUsed);
+
 
                             command.ExecuteNonQuery();
                         }
@@ -333,14 +357,29 @@ namespace FRITES_Design
 
                 using (var command = connection.CreateCommand())
                 {
+                    if (parentId.HasValue)
+                    {
+                        command.CommandText = "SELECT Id FROM categories WHERE name = @name AND parent_id = @parent LIMIT 1;";
+                        command.Parameters.AddWithValue("@parent", parentId.Value);
+                    }
+                    else
+                    {
+                        command.CommandText = "SELECT Id FROM categories WHERE name = @name AND parent_id IS NULL LIMIT 1;";
+                        command.Parameters.AddWithValue("@parent", DBNull.Value);
+                    }
+                    command.Parameters.AddWithValue("@name", name ?? "");
+
+                    var existingId = command.ExecuteScalar();
+                    if (existingId != null)
+                    {
+                        return Convert.ToInt32(existingId);
+                    }
+
                     command.CommandText = @"
                     INSERT INTO categories(name, parent_id)
                     VALUES(@name, @parent);
 
                     SELECT last_insert_rowid();";
-
-                    command.Parameters.AddWithValue("@name", name ?? "");
-                    command.Parameters.AddWithValue("@parent", (object)parentId ?? DBNull.Value);
 
                     return Convert.ToInt32(command.ExecuteScalar());
                 }
@@ -515,7 +554,8 @@ namespace FRITES_Design
                 ImageLink = reader.IsDBNull(5) ? null : reader.GetString(5),
                 ThumbnailLink = reader.IsDBNull(6) ? null : reader.GetString(6),
                 CategoryId = reader.GetInt32(7),
-                ProductPageLink = reader.IsDBNull(8) ? null : reader.GetString(8)
+                ProductPageLink = reader.IsDBNull(8) ? null : reader.GetString(8),
+                CommonlyUsed = reader.GetInt32(9) == 1
             };
         }
 
@@ -527,6 +567,35 @@ namespace FRITES_Design
                 Name = reader.GetString(1),
                 ParentId = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2)
             };
+        }
+
+        internal List<Part> GetCommonlyUsedParts()
+        {
+            List<Part> parts = new List<Part>();
+
+            using (var connection = GetDBConnection())
+            {
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                SELECT *
+                FROM parts
+                WHERE commonly_used = 1
+                ORDER BY id;";
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            parts.Add(MapPart(reader));
+                        }
+                    }
+                }
+            }
+
+            return parts;
         }
     }
 }

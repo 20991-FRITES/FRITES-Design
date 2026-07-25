@@ -183,6 +183,12 @@
   <ItemGroup>
     <Compile Include="Category.cs" />
     <Compile Include="DataManager.cs" />
+    <Compile Include="LibrarySetupForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="LibrarySetupForm.Designer.cs">
+      <DependentUpon>LibrarySetupForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="LoadingForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -213,6 +219,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="LibrarySetupForm.resx">
+      <DependentUpon>LibrarySetupForm.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="LoadingForm.resx">
       <DependentUpon>LoadingForm.cs</DependentUpon>
     </EmbeddedResource>

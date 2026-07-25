@@ -26,14 +26,14 @@ namespace FRITES_Design
             this.updatePartListButton = new System.Windows.Forms.ToolStripButton();
             this.refreshButton = new System.Windows.Forms.ToolStripButton();
             this.downloadButton = new System.Windows.Forms.ToolStripButton();
+            this.deleteButton = new System.Windows.Forms.ToolStripButton();
+            this.openInBrowserButton = new System.Windows.Forms.ToolStripButton();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.searchTextBox = new System.Windows.Forms.TextBox();
             this.treeListView1 = new BrightIdeasSoftware.TreeListView();
             this.PartName = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.SKU = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.downloaded = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
-            this.deleteButton = new System.Windows.Forms.ToolStripButton();
-            this.openInBrowserButton = new System.Windows.Forms.ToolStripButton();
             this.toolStrip1.SuspendLayout();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.treeListView1)).BeginInit();
@@ -96,6 +96,28 @@ namespace FRITES_Design
             this.downloadButton.Size = new System.Drawing.Size(60, 60);
             this.downloadButton.Text = "Download";
             this.downloadButton.Click += new System.EventHandler(this.downloadButton_ClickAsync);
+            // 
+            // deleteButton
+            // 
+            this.deleteButton.AutoSize = false;
+            this.deleteButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.deleteButton.Image = ((System.Drawing.Image)(resources.GetObject("deleteButton.Image")));
+            this.deleteButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.deleteButton.Name = "deleteButton";
+            this.deleteButton.Size = new System.Drawing.Size(60, 60);
+            this.deleteButton.Text = "Delete";
+            this.deleteButton.Click += new System.EventHandler(this.deleteButton_Click);
+            // 
+            // openInBrowserButton
+            // 
+            this.openInBrowserButton.AutoSize = false;
+            this.openInBrowserButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.openInBrowserButton.Image = ((System.Drawing.Image)(resources.GetObject("openInBrowserButton.Image")));
+            this.openInBrowserButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.openInBrowserButton.Name = "openInBrowserButton";
+            this.openInBrowserButton.Size = new System.Drawing.Size(60, 60);
+            this.openInBrowserButton.Text = "Open in browser";
+            this.openInBrowserButton.Click += new System.EventHandler(this.openInBrowserButton_Click);
             // 
             // tableLayoutPanel1
             // 
@@ -171,28 +193,6 @@ namespace FRITES_Design
             // 
             this.downloaded.Text = "Downloaded";
             this.downloaded.Width = 90;
-            // 
-            // deleteButton
-            // 
-            this.deleteButton.AutoSize = false;
-            this.deleteButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.deleteButton.Image = ((System.Drawing.Image)(resources.GetObject("deleteButton.Image")));
-            this.deleteButton.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.deleteButton.Name = "deleteButton";
-            this.deleteButton.Size = new System.Drawing.Size(60, 60);
-            this.deleteButton.Text = "Delete";
-            this.deleteButton.Click += new System.EventHandler(this.deleteButton_Click);
-            // 
-            // openInBrowserButton
-            // 
-            this.openInBrowserButton.AutoSize = false;
-            this.openInBrowserButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.openInBrowserButton.Image = ((System.Drawing.Image)(resources.GetObject("openInBrowserButton.Image")));
-            this.openInBrowserButton.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.openInBrowserButton.Name = "openInBrowserButton";
-            this.openInBrowserButton.Size = new System.Drawing.Size(60, 60);
-            this.openInBrowserButton.Text = "Open in browser";
-            this.openInBrowserButton.Click += new System.EventHandler(this.openInBrowserButton_Click);
             // 
             // TaskpaneHostUI
             // 
