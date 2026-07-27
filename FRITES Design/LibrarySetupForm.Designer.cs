@@ -35,6 +35,7 @@
             this.columnButtonRenderer1 = new BrightIdeasSoftware.ColumnButtonRenderer();
             this.buildCacheButton = new System.Windows.Forms.Button();
             this.skipButton = new System.Windows.Forms.Button();
+            this.multithreadingCheckbox = new System.Windows.Forms.CheckBox();
             this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -75,7 +76,8 @@
             // 
             // buildCacheButton
             // 
-            this.buildCacheButton.Location = new System.Drawing.Point(473, 434);
+            this.buildCacheButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.buildCacheButton.Location = new System.Drawing.Point(473, 479);
             this.buildCacheButton.Name = "buildCacheButton";
             this.buildCacheButton.Size = new System.Drawing.Size(288, 50);
             this.buildCacheButton.TabIndex = 2;
@@ -85,7 +87,8 @@
             // 
             // skipButton
             // 
-            this.skipButton.Location = new System.Drawing.Point(365, 434);
+            this.skipButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.skipButton.Location = new System.Drawing.Point(365, 479);
             this.skipButton.Name = "skipButton";
             this.skipButton.Size = new System.Drawing.Size(102, 50);
             this.skipButton.TabIndex = 3;
@@ -93,12 +96,23 @@
             this.skipButton.UseVisualStyleBackColor = true;
             this.skipButton.Click += new System.EventHandler(this.skipButton_Click);
             // 
+            // multithreadingCheckbox
+            // 
+            this.multithreadingCheckbox.AutoSize = true;
+            this.multithreadingCheckbox.Location = new System.Drawing.Point(17, 423);
+            this.multithreadingCheckbox.Name = "multithreadingCheckbox";
+            this.multithreadingCheckbox.Size = new System.Drawing.Size(504, 34);
+            this.multithreadingCheckbox.TabIndex = 4;
+            this.multithreadingCheckbox.Text = "Use multithreading (faster, but requires beefy cpu)";
+            this.multithreadingCheckbox.UseVisualStyleBackColor = true;
+            // 
             // LibrarySetupForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(13F, 32F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 30F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(776, 496);
+            this.ClientSize = new System.Drawing.Size(776, 541);
             this.ControlBox = false;
+            this.Controls.Add(this.multithreadingCheckbox);
             this.Controls.Add(this.skipButton);
             this.Controls.Add(this.buildCacheButton);
             this.Controls.Add(this.panel1);
@@ -109,6 +123,7 @@
             this.Text = "FTC Parts Cache";
             this.panel1.ResumeLayout(false);
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -120,5 +135,6 @@
         private BrightIdeasSoftware.ColumnButtonRenderer columnButtonRenderer1;
         private System.Windows.Forms.Button buildCacheButton;
         private System.Windows.Forms.Button skipButton;
+        private System.Windows.Forms.CheckBox multithreadingCheckbox;
     }
 }

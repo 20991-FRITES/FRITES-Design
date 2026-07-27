@@ -328,75 +328,70 @@ namespace FRITES_Design
                 searching = true;
 
                 var results = dataManager.QueryParts(searchTextBox.Text);
-                sw.Stop();
-                Debug.WriteLine("QueyParts ms " + sw.ElapsedMilliseconds);
-                sw.Reset();
-                sw.Start();
-                var roots = BuildSearchTree(results);
-                sw.Stop();
-                Debug.WriteLine("BuildSearchTree ms " + sw.ElapsedMilliseconds);
-                sw.Reset();
-                sw.Start();
-                treeListView1.SetObjects(roots);
-                sw.Stop();
-                Debug.WriteLine("SetObjects(roots) ms " + sw.ElapsedMilliseconds);
-                sw.Reset();
-                sw.Start();
-                treeListView1.ExpandAll();
-                sw.Stop();
-                Debug.WriteLine("ExpandAll ms " + sw.ElapsedMilliseconds);
 
+                var roots = BuildSearchTree(results);
+
+                treeListView1.SetObjects(roots);
+                treeListView1.ExpandAll();
             }
         }
         private List<Category> BuildSearchTree(List<Part> parts)
         {
             var roots = new List<Category>();
 
+            // Fast lookup of created nodes
+            var createdNodes = new Dictionary<int, Category>();
+
+            // Cache the path for each category
+            var pathCache = new Dictionary<int, List<Category>>();
+
             foreach (var part in parts)
             {
-                // Build the path from the part's category to the root
-                var path = new Stack<Category>();
-
-                Category current = dataManager.GetCategoryById(part.CategoryId);
-
-                while (current != null)
+                if (!pathCache.TryGetValue(part.CategoryId, out var path))
                 {
-                    path.Push(current);
+                    path = new List<Category>();
 
-                    if (current.ParentId == null)
-                        break;
+                    var current = dataManager.GetCategoryById(part.CategoryId);
 
-                    current = dataManager.GetCategoryById(current.ParentId.Value);
+                    while (current != null)
+                    {
+                        path.Add(current);
+
+                        if (current.ParentId == null)
+                            break;
+
+                        current = dataManager.GetCategoryById(current.ParentId.Value);
+                    }
+
+                    path.Reverse();
+                    pathCache[part.CategoryId] = path;
                 }
 
-                // Walk down the path, creating folders as needed
-                List<Category> currentLevel = roots;
-                Category currentNode = null;
+                Category parent = null;
 
-                while (path.Count > 0)
+                foreach (var cat in path)
                 {
-                    var cat = path.Pop();
-
-                    var existing = currentLevel.FirstOrDefault(c => c.Id == cat.Id);
-
-                    if (existing == null)
+                    if (!createdNodes.TryGetValue(cat.Id, out var node))
                     {
-                        existing = new Category
+                        node = new Category
                         {
                             Id = cat.Id,
                             Name = cat.Name,
                             ParentId = cat.ParentId
                         };
 
-                        currentLevel.Add(existing);
+                        createdNodes.Add(cat.Id, node);
+
+                        if (parent == null)
+                            roots.Add(node);
+                        else
+                            parent.Categories.Add(node);
                     }
 
-                    currentNode = existing;
-                    currentLevel = existing.Categories;
+                    parent = node;
                 }
 
-                // Finally add the matching part
-                currentNode.Parts.Add(part);
+                parent.Parts.Add(part);
             }
 
             return roots;

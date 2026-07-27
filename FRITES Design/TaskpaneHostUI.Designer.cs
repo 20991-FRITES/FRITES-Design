@@ -146,7 +146,7 @@ namespace FRITES_Design
             this.searchTextBox.Location = new System.Drawing.Point(4, 3);
             this.searchTextBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             this.searchTextBox.Name = "searchTextBox";
-            this.searchTextBox.Size = new System.Drawing.Size(899, 39);
+            this.searchTextBox.Size = new System.Drawing.Size(899, 35);
             this.searchTextBox.TabIndex = 0;
             this.searchTextBox.TextChanged += new System.EventHandler(this.searchTextBox_TextChanged);
             // 
@@ -196,7 +196,7 @@ namespace FRITES_Design
             // 
             // TaskpaneHostUI
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(14F, 29F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.toolStrip1);
