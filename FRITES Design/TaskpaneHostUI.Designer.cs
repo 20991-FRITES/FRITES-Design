@@ -83,7 +83,7 @@ namespace FRITES_Design
             this.refreshButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.refreshButton.Name = "refreshButton";
             this.refreshButton.Size = new System.Drawing.Size(60, 60);
-            this.refreshButton.Text = "refresh";
+            this.refreshButton.Text = "Refresh";
             this.refreshButton.Click += new System.EventHandler(this.refreshButton_Click);
             // 
             // downloadButton
@@ -94,7 +94,7 @@ namespace FRITES_Design
             this.downloadButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.downloadButton.Name = "downloadButton";
             this.downloadButton.Size = new System.Drawing.Size(60, 60);
-            this.downloadButton.Text = "Download";
+            this.downloadButton.Text = "Download";
             this.downloadButton.Click += new System.EventHandler(this.downloadButton_ClickAsync);
             // 
             // deleteButton

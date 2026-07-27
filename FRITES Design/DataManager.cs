@@ -396,11 +396,16 @@ namespace FRITES_Design
 
                 using (var command = connection.CreateCommand())
                 {
+                    //command.CommandText = @"
+                    //    SELECT Id, name, parent_id
+                    //    FROM categories
+                    //    WHERE parent_id IS (SELECT id FROM categories WHERE parent_id IS NULL)
+                    //    ORDER BY name;";
+
                     command.CommandText = @"
-                        SELECT Id, name, parent_id
-                        FROM categories
-                        WHERE parent_id IS NULL
-                        ORDER BY name;";
+                        SELECT c1.Id AS Id, c1.name as name, c1.parent_id as parent_id
+                        FROM categories AS c1
+                        INNER JOIN categories AS c2 ON c1.parent_id = c2.Id AND c2.parent_id IS NULL";
 
                     using (var reader = command.ExecuteReader())
                     {

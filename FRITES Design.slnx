@@ -1,4 +1,4 @@
 <Solution>
-  <Project Path="../../../Downloads/ObjectListViewDemo/ObjectListView/ObjectListView2012.csproj" Id="18feda0c-d147-4286-b39a-01204808106a" />
   <Project Path="FRITES Design/FRITES Design.csproj" Id="0483a891-c7a9-42dd-b5a5-84386534ce99" />
+  <Project Path="ObjectListViewDemo/ObjectListView/ObjectListView2012.csproj" Id="18feda0c-d147-4286-b39a-01204808106a" />
 </Solution>

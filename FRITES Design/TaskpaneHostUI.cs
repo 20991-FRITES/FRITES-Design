@@ -323,13 +323,29 @@ namespace FRITES_Design
             }
             else
             {
+                Stopwatch sw = Stopwatch.StartNew();
+                sw.Start();
                 searching = true;
 
                 var results = dataManager.QueryParts(searchTextBox.Text);
+                sw.Stop();
+                Debug.WriteLine("QueyParts ms " + sw.ElapsedMilliseconds);
+                sw.Reset();
+                sw.Start();
                 var roots = BuildSearchTree(results);
-
+                sw.Stop();
+                Debug.WriteLine("BuildSearchTree ms " + sw.ElapsedMilliseconds);
+                sw.Reset();
+                sw.Start();
                 treeListView1.SetObjects(roots);
+                sw.Stop();
+                Debug.WriteLine("SetObjects(roots) ms " + sw.ElapsedMilliseconds);
+                sw.Reset();
+                sw.Start();
                 treeListView1.ExpandAll();
+                sw.Stop();
+                Debug.WriteLine("ExpandAll ms " + sw.ElapsedMilliseconds);
+
             }
         }
         private List<Category> BuildSearchTree(List<Part> parts)
@@ -391,6 +407,14 @@ namespace FRITES_Design
             selectedPart = treeListView1.SelectedObject as Part;
         }
 
+        private async void DownloadPartList(List<Part> parts)
+        {
+            var loading = new LoadingForm();
+            loading.SetLabel("Downloading and converting parts...");
+            loading.Shown += async (_, __) => await OnDownloadLoadingShown(loading, parts);
+            loading.ShowDialog(this);
+        }
+
         private void downloadButton_ClickAsync(object sender, EventArgs e)
         {
             var selectedParts = treeListView1.SelectedObjects.OfType<Part>().ToList();
@@ -401,11 +425,7 @@ namespace FRITES_Design
                 return;
             }
 
-            var loading = new LoadingForm();
-            loading.SetLabel("Downloading and converting parts...");
-            loading.Shown += async (_, __) => await OnDownloadLoadingShown(loading, selectedParts);
-            loading.ShowDialog(this);
-
+            DownloadPartList(selectedParts);
         }
 
         private async Task OnDownloadLoadingShown(LoadingForm loading, List<Part> selectedParts)
@@ -468,6 +488,7 @@ namespace FRITES_Design
 
             if (!Directory.Exists(partDir))
             {
+                DownloadPartList(new List<Part> { selectedPart });   
                 return;
             }
 
