@@ -23,7 +23,8 @@ namespace FRITES.Core
                     job.Name,
                     job.StepFile,
                     false,
-                    job.Material);
+                    job.Material,
+                    job.Finish);
 
                 completed?.Invoke(job);
             }

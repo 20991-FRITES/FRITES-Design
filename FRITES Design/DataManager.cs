@@ -58,6 +58,7 @@ namespace FRITES_Design
                         product_page_link TEXT,
                         commonly_used INTEGER DEFAULT 0,    
                         material TEXT,
+                        finish TEXT,
                         FOREIGN KEY(category_id) REFERENCES categories(Id)
                     );";
 
@@ -188,7 +189,8 @@ namespace FRITES_Design
                     CategoryId = currentCategoryId ?? 0,
                     ProductPageLink = node["url"]?.ToString(),
                     CommonlyUsed = node["commonly_used"]?.GetValue<bool>() ?? false,
-                    Material = node["material"]?.ToString()
+                    Material = node["material"]?.ToString(),
+                    Finish = node["finish"]?.ToString()
                 });
             }
 
@@ -317,9 +319,9 @@ namespace FRITES_Design
                         foreach (var part in parts)
                         {
                             command.CommandText = @"INSERT OR IGNORE INTO parts
-                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link, commonly_used, material)
+                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link, commonly_used, material, finish)
                             VALUES
-                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link,@commonly_used,@material)";
+                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link,@commonly_used,@material,@finish)";
 
                             command.Parameters.Clear();
                             command.Parameters.AddWithValue("@name", part.Name ?? "");
@@ -332,7 +334,7 @@ namespace FRITES_Design
                             command.Parameters.AddWithValue("@product_page_link", part.ProductPageLink ?? (object)DBNull.Value);
                             command.Parameters.AddWithValue("@commonly_used", part.CommonlyUsed);
                             command.Parameters.AddWithValue("@material", part.Material ?? (object)DBNull.Value);
-
+                            command.Parameters.AddWithValue("@finish", part.Finish ?? (object)DBNull.Value);
 
                             command.ExecuteNonQuery();
                         }
@@ -562,7 +564,8 @@ namespace FRITES_Design
                 CategoryId = reader.GetInt32(7),
                 ProductPageLink = reader.IsDBNull(8) ? null : reader.GetString(8),
                 CommonlyUsed = reader.GetInt32(9) == 1,
-                Material = reader.IsDBNull(10) ? null : reader.GetString(10)
+                Material = reader.IsDBNull(10) ? null : reader.GetString(10),
+                Finish = reader.IsDBNull(11) ? null : reader.GetString(11)
             };
         }
 

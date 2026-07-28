@@ -13,6 +13,7 @@ namespace FRITES.Core
 
         public string StepFile { get; set; }
         public string Material { get; set; } = null;
+        public string Finish { get; set; } = null;
 
         public static List<ImportJob> LoadJobs(string filePath)
         {

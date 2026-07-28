@@ -100,7 +100,8 @@ namespace FRITES.Core
     string name,
     string stepFile,
     bool preload = false,
-    string swMaterial = null)
+    string swMaterial = null,
+    string swFinish = null)
         {
 
             swApp.SetUserPreferenceToggle((int) swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect, true);
@@ -163,23 +164,58 @@ namespace FRITES.Core
 
             if (!string.IsNullOrWhiteSpace(swMaterial))
             {
-                var part = (PartDoc)stepDoc;
+                try
+                {
+                    var part = (PartDoc)stepDoc;
 
-                string installDir = Path.GetDirectoryName(swApp.GetExecutablePath());
+                    string installDir = Path.GetDirectoryName(swApp.GetExecutablePath());
 
-                string materialDb = Path.Combine(
-                    installDir,
-                    "lang",
-                    "english",
-                    "sldmaterials",
-                    "SOLIDWORKS Materials.sldmat");
+                    string materialDb = Path.Combine(
+                        installDir,
+                        "lang",
+                        "english",
+                        "sldmaterials",
+                        "SOLIDWORKS Materials.sldmat");
 
-                part.SetMaterialPropertyName2(
-                    "",
-                    materialDb,
-                    swMaterial);
+                    string appearanceFolder = Path.Combine(
+                        installDir,
+                        "SOLIDWORKS",
+                        "data",
+                        "graphics",
+                        "Materials");
+
+                    part.SetMaterialPropertyName2(
+                        "",
+                        materialDb,
+                        swMaterial);
+
+                    string appearanceFile = Path.Combine(
+                        appearanceFolder,
+                        swFinish);
+
+                    // Apply the appearance to the part
+                    if (File.Exists(appearanceFile))
+                    {
+                        RenderMaterial renderMat =
+                            stepDoc.Extension.CreateRenderMaterial(appearanceFile);
+
+                        if (renderMat != null)
+                        {
+                            renderMat.AddEntity(stepDoc);          // Apply to the whole part
+                            int materialId;
+                            bool success = stepDoc.Extension.AddRenderMaterial(renderMat, out materialId);
+
+                            stepDoc.GraphicsRedraw2();
+                            stepDoc.ForceRebuild3(false);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to set material: {swMaterial}");
+                    Debug.WriteLine(ex);
+                }
             }
-
             try
             {
                 int saveErrors = 0;

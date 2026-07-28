@@ -234,8 +234,7 @@ namespace FRITES_Design
     LoadingForm loading,
     List<ImportJob> jobs)
         {
-            int workerCount = 2;
-
+            int workerCount = 4;
             var workerJobs = Enumerable.Range(0, workerCount)
                 .Select(_ => new List<ImportJob>())
                 .ToArray();
@@ -259,20 +258,46 @@ namespace FRITES_Design
             int completed = 0;
             int total = jobs.Count;
 
-            double averageSecondsPerPart = 8.0 / workerCount;
+            // Smoothed average seconds between completed parts.
+            double averageSecondsPerCompletion = 0;
+            const double SmoothingFactor = 0.2;
+
+            var completionTimer = Stopwatch.StartNew();
+            long lastCompletionTicks = completionTimer.ElapsedTicks;
+            object etaLock = new object();
 
             void ReportProgress()
             {
                 int value = Interlocked.Increment(ref completed);
+
+                lock (etaLock)
+                {
+                    long now = completionTimer.ElapsedTicks;
+                    double elapsedSeconds =
+                        (now - lastCompletionTicks) / (double)Stopwatch.Frequency;
+
+                    lastCompletionTicks = now;
+
+                    if (averageSecondsPerCompletion == 0)
+                    {
+                        averageSecondsPerCompletion = elapsedSeconds;
+                    }
+                    else
+                    {
+                        averageSecondsPerCompletion =
+                            averageSecondsPerCompletion * (1 - SmoothingFactor) +
+                            elapsedSeconds * SmoothingFactor;
+                    }
+                }
 
                 BeginInvoke(new Action(() =>
                 {
                     loading.SetProgress(value * 100 / total);
 
                     double remaining =
-                        (total - completed) * averageSecondsPerPart;
+                        (total - value) * averageSecondsPerCompletion;
 
-                    loading.SetETA(TimeSpan.FromSeconds(remaining));
+                    loading.SetETA(TimeSpan.FromSeconds(Math.Max(0, remaining)));
                 }));
             }
 
@@ -321,7 +346,7 @@ namespace FRITES_Design
             ImportRunner.Run(
                 SwApp,
                 workerJobs[workerCount - 1],
-                job => ReportProgress());
+                _ => ReportProgress());
 
             //
             // Wait for external workers.
@@ -351,6 +376,7 @@ namespace FRITES_Design
                     File.Delete(jobFile);
             }
 
+            loading.SetProgress(100);
             loading.SetETA(TimeSpan.Zero);
         }
 
@@ -595,17 +621,23 @@ namespace FRITES_Design
     LoadingForm loading,
     List<Part> selectedParts)
         {
-            const double AverageSecondsPerPart = 1;
-
             var jobs = new List<ImportJob>();
 
             int total = selectedParts.Count;
+
+            // Smoothed average download time (seconds)
+            double averageSeconds = 0;
+            const double SmoothingFactor = 0.2; // 20% new sample, 80% history
 
             for (int i = 0; i < total; i++)
             {
                 Part part = selectedParts[i];
 
+                var partTimer = Stopwatch.StartNew();
+
                 string stepFile = await PartDownloader.DownloadStepAsync(part);
+
+                partTimer.Stop();
 
                 if (stepFile != null)
                 {
@@ -614,21 +646,36 @@ namespace FRITES_Design
                         Sku = part.Sku,
                         Name = part.Name,
                         StepFile = stepFile,
-                        Material = part.Material
+                        Material = part.Material,
+                        Finish = part.Finish
                     });
                 }
 
-                // Progress after finishing one file
+                // Update smoothed average
+                double elapsedSeconds = partTimer.Elapsed.TotalSeconds;
+
+                if (averageSeconds == 0)
+                {
+                    averageSeconds = elapsedSeconds;
+                }
+                else
+                {
+                    averageSeconds =
+                        averageSeconds * (1 - SmoothingFactor) +
+                        elapsedSeconds * SmoothingFactor;
+                }
+
                 int completed = i + 1;
 
                 loading.SetProgress(completed * 100 / total);
 
                 double remainingSeconds =
-                    (total - completed) * AverageSecondsPerPart;
+                    (total - completed) * averageSeconds;
 
                 loading.SetETA(TimeSpan.FromSeconds(remainingSeconds));
             }
 
+            loading.SetProgress(100);
             loading.SetETA(TimeSpan.Zero);
 
             return jobs;
@@ -663,7 +710,7 @@ namespace FRITES_Design
                     string stepFile = await PartDownloader.DownloadStepAsync(part);
                     if (stepFile == null)
                         continue;
-                    PartDownloader.ImportStep(SwApp, part.Sku, part.Name, stepFile, false, part.Material);
+                    PartDownloader.ImportStep(SwApp, part.Sku, part.Name, stepFile, false, part.Material, part.Finish);
                 }
 
                 loading.SetETA(TimeSpan.Zero);
