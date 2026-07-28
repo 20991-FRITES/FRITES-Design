@@ -1,4 +1,5 @@
 ﻿using BrightIdeasSoftware;
+using FRITES.Core;
 using FRITES_Design.Properties;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
@@ -12,6 +13,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
@@ -163,50 +166,214 @@ namespace FRITES_Design
             return !File.Exists(GetLibrarySetupSuppressionPath());
         }
 
-        private void updateButton_Click(object sender, EventArgs e)
+        private async void updateButton_Click(object sender, EventArgs e)
         {
             var loading = new LoadingForm();
             loading.Shown += async (_, __) => await OnUpdateLoadingShown(loading);
             loading.ShowDialog(this);
 
-            if (ShouldShowLibrarySetupForm())
+            if (!ShouldShowLibrarySetupForm())
+                return;
+
+            var setupForm = new LibrarySetupForm();
+
+            if (setupForm.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            SuppressLibrarySetupForm();
+
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            var parts = dataManager.GetCommonlyUsedParts();
+
+            if (setupForm.multithreadingEnabled)
             {
-                var setupForm = new LibrarySetupForm();
-                DialogResult result = setupForm.ShowDialog(this);
+                List<ImportJob> jobs = null;
 
-                if (result != DialogResult.OK)
+                loading = new LoadingForm();
+                loading.SetLabel("Downloading parts...");
+
+                loading.Shown += async (_, __) =>
                 {
-                    SuppressLibrarySetupForm();
-                    return;
-                }
+                    jobs = await DownloadPartsAsync(loading, parts);
+                    loading.Close();
+                };
 
-                SuppressLibrarySetupForm();
+                loading.ShowDialog(this);
 
+                loading = new LoadingForm();
+                loading.SetLabel("Importing parts...");
 
-                Stopwatch stopwatch = Stopwatch.StartNew();
+                loading.Shown += async (_, __) =>
+                {
+                    await RunMultiProcessImport(loading, jobs);
+                    loading.Close();
+                };
 
-                var parts = dataManager.GetCommonlyUsedParts();
-
+                loading.ShowDialog(this);
+            }
+            else
+            {
                 loading = new LoadingForm();
                 loading.SetLabel("Downloading and converting parts...");
                 loading.Shown += async (_, __) => await OnDownloadLoadingShown(loading, parts);
                 loading.ShowDialog(this);
-
-                stopwatch.Stop();
-
-                MessageBox.Show(
-                    $"Library setup completed successfully.\n\nTime taken: {stopwatch.Elapsed}",
-                    "Update Complete",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
             }
+
+            stopwatch.Stop();
+
+            MessageBox.Show(
+                $"Library setup completed successfully.\n\nTime taken: {stopwatch.Elapsed}",
+                "Update Complete",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+
+        private async Task RunMultiProcessImport(
+    LoadingForm loading,
+    List<ImportJob> jobs)
+        {
+            int workerCount = 2;
+
+            var workerJobs = Enumerable.Range(0, workerCount)
+                .Select(_ => new List<ImportJob>())
+                .ToArray();
+
+            for (int i = 0; i < jobs.Count; i++)
+            {
+                workerJobs[i % workerCount].Add(jobs[i]);
+            }
+
+            string jobsFolder = Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+                "FRITES Design",
+                "Jobs");
+
+            Directory.CreateDirectory(jobsFolder);
+
+            string importerExe = Path.Combine(
+                Path.GetDirectoryName(typeof(TaskpaneIntegration).Assembly.Location),
+                "FRITES-Importer.exe");
+
+            int completed = 0;
+            int total = jobs.Count;
+
+            double averageSecondsPerPart = 8.0 / workerCount;
+
+            void ReportProgress()
+            {
+                int value = Interlocked.Increment(ref completed);
+
+                BeginInvoke(new Action(() =>
+                {
+                    loading.SetProgress(value * 100 / total);
+
+                    double remaining =
+                        (total - completed) * averageSecondsPerPart;
+
+                    loading.SetETA(TimeSpan.FromSeconds(remaining));
+                }));
+            }
+
+            DataReceivedEventHandler handler = (_, e) =>
+            {
+                if (e.Data?.StartsWith("DONE:") == true)
+                {
+                    ReportProgress();
+                }
+            };
+
+            var processes = new List<(Process Process, string JobFile)>();
+
+            //
+            // Launch external workers (all except the last one)
+            //
+            for (int i = 0; i < workerCount - 1; i++)
+            {
+                string jobFile = Path.Combine(jobsFolder, $"worker{i}.json");
+
+                ImportJob.SaveJobs(jobFile, workerJobs[i]);
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = importerExe,
+                        Arguments = $"\"{jobFile}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.OutputDataReceived += handler;
+
+                process.Start();
+                process.BeginOutputReadLine();
+
+                processes.Add((process, jobFile));
+            }
+
+            //
+            // Existing SOLIDWORKS becomes the final worker.
+            //
+            ImportRunner.Run(
+                SwApp,
+                workerJobs[workerCount - 1],
+                job => ReportProgress());
+
+            //
+            // Wait for external workers.
+            //
+            await Task.Run(() =>
+            {
+                foreach (var (process, _) in processes)
+                {
+                    process.WaitForExit();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception(
+                            $"Importer worker exited with code {process.ExitCode}.");
+                    }
+                }
+            });
+
+            //
+            // Cleanup.
+            //
+            foreach (var (process, jobFile) in processes)
+            {
+                process.Dispose();
+
+                if (File.Exists(jobFile))
+                    File.Delete(jobFile);
+            }
+
+            loading.SetETA(TimeSpan.Zero);
         }
 
         private async Task OnUpdateLoadingShown(LoadingForm loading)
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
-                var progress = new Progress<int>(loading.SetProgress);
+                var progress = new Progress<int>(value =>
+                {
+                    loading.SetProgress(value);
+
+                    if (value > 0)
+                    {
+                        var elapsed = stopwatch.Elapsed;
+                        var totalEstimated = TimeSpan.FromTicks(elapsed.Ticks * 100L / value);
+                        var eta = totalEstimated - elapsed;
+
+                        loading.SetETA(eta);
+                    }
+                });
+
                 await dataManager.UpdateParts(progress);
             }
             catch (Exception ex)
@@ -215,6 +382,7 @@ namespace FRITES_Design
             }
             finally
             {
+                stopwatch.Stop();
                 loading.Close();
                 RefreshTree();
                 loading.Dispose();
@@ -423,10 +591,55 @@ namespace FRITES_Design
             DownloadPartList(selectedParts);
         }
 
+        private async Task<List<ImportJob>> DownloadPartsAsync(
+    LoadingForm loading,
+    List<Part> selectedParts)
+        {
+            const double AverageSecondsPerPart = 1;
+
+            var jobs = new List<ImportJob>();
+
+            int total = selectedParts.Count;
+
+            for (int i = 0; i < total; i++)
+            {
+                Part part = selectedParts[i];
+
+                string stepFile = await PartDownloader.DownloadStepAsync(part);
+
+                if (stepFile != null)
+                {
+                    jobs.Add(new ImportJob
+                    {
+                        Sku = part.Sku,
+                        Name = part.Name,
+                        StepFile = stepFile,
+                        Material = part.Material
+                    });
+                }
+
+                // Progress after finishing one file
+                int completed = i + 1;
+
+                loading.SetProgress(completed * 100 / total);
+
+                double remainingSeconds =
+                    (total - completed) * AverageSecondsPerPart;
+
+                loading.SetETA(TimeSpan.FromSeconds(remainingSeconds));
+            }
+
+            loading.SetETA(TimeSpan.Zero);
+
+            return jobs;
+        }
+
         private async Task OnDownloadLoadingShown(LoadingForm loading, List<Part> selectedParts)
         {
             const double AverageSecondsPerPart = 12.0;
 
+            SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
+            SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
             try
             {
                 int total = selectedParts.Count;
@@ -447,7 +660,10 @@ namespace FRITES_Design
                         loading.SetETA(TimeSpan.FromSeconds(remainingSeconds));
                     });
 
-                    await PartDownloader.DownloadPart(SwApp, part, progress);
+                    string stepFile = await PartDownloader.DownloadStepAsync(part);
+                    if (stepFile == null)
+                        continue;
+                    PartDownloader.ImportStep(SwApp, part.Sku, part.Name, stepFile, false, part.Material);
                 }
 
                 loading.SetETA(TimeSpan.Zero);
@@ -460,6 +676,8 @@ namespace FRITES_Design
             {
                 loading.Close();
                 loading.Dispose();
+                SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
+                SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
             }
         }
 
@@ -468,7 +686,7 @@ namespace FRITES_Design
             ModelDoc2 model = (ModelDoc2)SwApp.ActiveDoc;
 
             if (model == null ||
-                model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
+                model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY || selectedPart == null)
                 return;
 
             _dragAssembly = (AssemblyDoc)model;
@@ -483,7 +701,7 @@ namespace FRITES_Design
 
             if (!Directory.Exists(partDir))
             {
-                DownloadPartList(new List<Part> { selectedPart });   
+                DownloadPartList(new List<Part> { selectedPart });
                 return;
             }
 

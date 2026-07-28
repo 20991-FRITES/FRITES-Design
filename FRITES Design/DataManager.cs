@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-
+using FRITES.Core;
 
 namespace FRITES_Design
 {
@@ -18,10 +18,8 @@ namespace FRITES_Design
         string DBPath;
         static readonly HttpClient httpClient = new HttpClient();
 
-    //    private const string PART_LIST_ENDPOINT =
-    //"https://gist.githubusercontent.com/Blue25GD/7732b771724a335f63114d55bbeab7ad/raw/96c0f7512330727260348eb07e64691d175d3a54/parts";
         private const string PART_LIST_ENDPOINT =
-    "https://gist.githubusercontent.com/Blue25GD/7732b771724a335f63114d55bbeab7ad/raw/1cd2b83924398f6566b009b2301928452e88663a/parts";
+    "https://20991-frites.github.io/FRITES-Design-Scraper/full_structure.json";
 
         public DataManager()
         {
@@ -59,6 +57,7 @@ namespace FRITES_Design
                         category_id INTEGER,
                         product_page_link TEXT,
                         commonly_used INTEGER DEFAULT 0,    
+                        material TEXT,
                         FOREIGN KEY(category_id) REFERENCES categories(Id)
                     );";
 
@@ -188,7 +187,8 @@ namespace FRITES_Design
                     ImageLink = node["image_url"]?.ToString(),
                     CategoryId = currentCategoryId ?? 0,
                     ProductPageLink = node["url"]?.ToString(),
-                    CommonlyUsed = node["commonly_used"]?.GetValue<bool>() ?? false
+                    CommonlyUsed = node["commonly_used"]?.GetValue<bool>() ?? false,
+                    Material = node["material"]?.ToString()
                 });
             }
 
@@ -317,9 +317,9 @@ namespace FRITES_Design
                         foreach (var part in parts)
                         {
                             command.CommandText = @"INSERT OR IGNORE INTO parts
-                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link, commonly_used)
+                            (name, sku, step_link, manufacturer, image_link, thumbnail_link, category_id, product_page_link, commonly_used, material)
                             VALUES
-                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link,@commonly_used)";
+                            (@name,@sku,@step_link,@manufacturer,@image_link,@thumbnail_link,@category_id,@product_page_link,@commonly_used,@material)";
 
                             command.Parameters.Clear();
                             command.Parameters.AddWithValue("@name", part.Name ?? "");
@@ -331,6 +331,7 @@ namespace FRITES_Design
                             command.Parameters.AddWithValue("@category_id", part.CategoryId);
                             command.Parameters.AddWithValue("@product_page_link", part.ProductPageLink ?? (object)DBNull.Value);
                             command.Parameters.AddWithValue("@commonly_used", part.CommonlyUsed);
+                            command.Parameters.AddWithValue("@material", part.Material ?? (object)DBNull.Value);
 
 
                             command.ExecuteNonQuery();
@@ -560,7 +561,8 @@ namespace FRITES_Design
                 ThumbnailLink = reader.IsDBNull(6) ? null : reader.GetString(6),
                 CategoryId = reader.GetInt32(7),
                 ProductPageLink = reader.IsDBNull(8) ? null : reader.GetString(8),
-                CommonlyUsed = reader.GetInt32(9) == 1
+                CommonlyUsed = reader.GetInt32(9) == 1,
+                Material = reader.IsDBNull(10) ? null : reader.GetString(10)
             };
         }
 

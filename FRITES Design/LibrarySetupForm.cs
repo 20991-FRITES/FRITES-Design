@@ -22,6 +22,11 @@ namespace FRITES_Design
 
         }
 
+        public bool multithreadingEnabled
+        {
+            get { return multithreadingCheckbox.Checked; }
+        }
+
         private void buildCacheButton_Click(object sender, EventArgs e)
         {
             DialogResult = DialogResult.OK;

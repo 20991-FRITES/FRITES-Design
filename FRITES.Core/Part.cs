@@ -1,4 +1,4 @@
-﻿namespace FRITES_Design
+﻿namespace FRITES.Core
 {
     public class Part
     {
@@ -12,5 +12,6 @@
         public int CategoryId { get; set; }
         public string ProductPageLink { get; set; }
         public bool CommonlyUsed { get; set; } = false;
+        public string Material { get; set; } = null;
     }
 }

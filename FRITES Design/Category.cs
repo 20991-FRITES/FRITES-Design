@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using FRITES.Core;
+using System.Collections.Generic;
 
 namespace FRITES_Design
 {

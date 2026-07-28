@@ -37,19 +37,19 @@
             // 
             this.progressBar1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar1.Location = new System.Drawing.Point(44, 113);
+            this.progressBar1.Location = new System.Drawing.Point(40, 108);
             this.progressBar1.MarqueeAnimationSpeed = 10;
             this.progressBar1.Name = "progressBar1";
-            this.progressBar1.Size = new System.Drawing.Size(726, 56);
+            this.progressBar1.Size = new System.Drawing.Size(666, 54);
             this.progressBar1.TabIndex = 0;
             // 
             // label1
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(37, 39);
+            this.label1.Location = new System.Drawing.Point(34, 37);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(289, 45);
+            this.label1.Size = new System.Drawing.Size(248, 38);
             this.label1.TabIndex = 1;
             this.label1.Text = "Updating part list...";
             // 
@@ -57,17 +57,17 @@
             // 
             this.label2.AutoSize = true;
             this.label2.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label2.Location = new System.Drawing.Point(39, 193);
+            this.label2.Location = new System.Drawing.Point(36, 185);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(269, 32);
+            this.label2.Size = new System.Drawing.Size(236, 30);
             this.label2.TabIndex = 2;
             this.label2.Text = "Estimated time left: N/A";
             // 
             // LoadingForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(11F, 24F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(816, 263);
+            this.ClientSize = new System.Drawing.Size(748, 252);
             this.ControlBox = false;
             this.Controls.Add(this.label2);
             this.Controls.Add(this.label1);

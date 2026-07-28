@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="FRITES Design/FRITES Design.csproj" Id="0483a891-c7a9-42dd-b5a5-84386534ce99" />
+  <Project Path="FRITES-Importer/FRITES-Importer.csproj" Id="4dac4da6-c547-4bc9-9b57-1b98c4a9539a" />
+  <Project Path="FRITES.Core/FRITES.Core.csproj" Id="f1d89f7d-dd7c-419e-8f62-4298f246b1c1" />
   <Project Path="ObjectListViewDemo/ObjectListView/ObjectListView2012.csproj" Id="18feda0c-d147-4286-b39a-01204808106a" />
 </Solution>
