@@ -28,7 +28,7 @@ namespace FRITES_Design
         public SldWorks SwApp { get; set; }
         public DataManager dataManager { get; set; }
 
-        private Part selectedPart;
+        private object SelectedTreeObject => treeListView1.SelectedObject;
         private readonly Dictionary<string, Image> imageCache = new Dictionary<string, Image>();
         private bool searching = false;
 
@@ -84,6 +84,10 @@ namespace FRITES_Design
                 }
                 return c.Categories.Cast<object>().Concat(c.Parts);
             }
+            if (x is Part p)
+            {
+                return VariantManager.GetVariants(p);
+            }
             return null;
         }
 
@@ -91,6 +95,8 @@ namespace FRITES_Design
         {
             if (x is Category c)
                 return dataManager.DoesCategoryHaveChildren(c.Id);
+            if (x is Part p)
+                return VariantManager.GetVariants(p).Count() > 1;
             return false;
         }
 
@@ -98,6 +104,7 @@ namespace FRITES_Design
         {
             if (x is Category c) return c.Name;
             if (x is Part p) return p.Name;
+            if (x is PartVariant v) return v.Name;
             return "";
         }
 
@@ -593,7 +600,6 @@ namespace FRITES_Design
 
         private void treeListView1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            selectedPart = treeListView1.SelectedObject as Part;
         }
 
         private async void DownloadPartList(List<Part> parts)
@@ -627,7 +633,7 @@ namespace FRITES_Design
 
             // Smoothed average download time (seconds)
             double averageSeconds = 0;
-            const double SmoothingFactor = 0.2; // 20% new sample, 80% history
+            const double SmoothingFactor = 0.2;
 
             for (int i = 0; i < total; i++)
             {
@@ -635,20 +641,23 @@ namespace FRITES_Design
 
                 var partTimer = Stopwatch.StartNew();
 
-                string stepFile = await PartDownloader.DownloadStepAsync(part);
+                string stepFolder = await PartDownloader.DownloadStepAsync(part);
 
                 partTimer.Stop();
 
-                if (stepFile != null)
+                if (stepFolder != null)
                 {
-                    jobs.Add(new ImportJob
+                    foreach (string stepFile in PartDownloader.EnumerateStepFiles(stepFolder))
                     {
-                        Sku = part.Sku,
-                        Name = part.Name,
-                        StepFile = stepFile,
-                        Material = part.Material,
-                        Finish = part.Finish
-                    });
+                        jobs.Add(new ImportJob
+                        {
+                            Sku = part.Sku,
+                            Name = part.Name,
+                            StepFile = stepFile,
+                            Material = part.Material,
+                            Finish = part.Finish
+                        });
+                    }
                 }
 
                 // Update smoothed average
@@ -687,32 +696,60 @@ namespace FRITES_Design
 
             SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
             SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
+
             try
             {
                 int total = selectedParts.Count;
+
+                string appData = System.Environment.GetFolderPath(
+                    System.Environment.SpecialFolder.LocalApplicationData);
 
                 for (int i = 0; i < total; i++)
                 {
                     Part part = selectedParts[i];
 
-                    var progress = new Progress<int>(p =>
-                    {
-                        double overall = (i + p / 100.0) / total;
-                        loading.SetProgress((int)(overall * 100));
+                    loading.SetProgress(i * 100 / total);
 
-                        // ETA
-                        double remainingParts = (total - i - 1) + (100 - p) / 100.0;
-                        double remainingSeconds = remainingParts * AverageSecondsPerPart;
+                    loading.SetETA(TimeSpan.FromSeconds(
+                        (total - i) * AverageSecondsPerPart));
 
-                        loading.SetETA(TimeSpan.FromSeconds(remainingSeconds));
-                    });
+                    string stepFolder = await PartDownloader.DownloadStepAsync(part);
 
-                    string stepFile = await PartDownloader.DownloadStepAsync(part);
-                    if (stepFile == null)
+                    if (stepFolder == null)
                         continue;
-                    PartDownloader.ImportStep(SwApp, part.Sku, part.Name, stepFile, false, part.Material, part.Finish);
+
+                    string partDirFinal = Path.Combine(
+                        appData,
+                        "FRITES Design",
+                        "Step",
+                        part.Sku);
+
+                    string partDirTemp = partDirFinal + ".tmp";
+
+                    foreach (string stepFile in PartDownloader.EnumerateStepFiles(stepFolder))
+                    {
+                        string outputFile = Path.Combine(
+                            partDirTemp,
+                            Path.GetFileNameWithoutExtension(stepFile) + ".sldprt");
+
+                        PartDownloader.ImportStep(
+                            SwApp,
+                            part.Sku,
+                            part.Name,
+                            stepFile,
+                            outputFile,
+                            false,
+                            part.Material,
+                            part.Finish);
+                    }
+
+                    if (!Directory.Exists(partDirFinal))
+                    {
+                        Directory.Move(partDirTemp, partDirFinal);
+                    }
                 }
 
+                loading.SetProgress(100);
                 loading.SetETA(TimeSpan.Zero);
             }
             catch (Exception ex)
@@ -723,6 +760,7 @@ namespace FRITES_Design
             {
                 loading.Close();
                 loading.Dispose();
+
                 SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
                 SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
             }
@@ -733,36 +771,54 @@ namespace FRITES_Design
             ModelDoc2 model = (ModelDoc2)SwApp.ActiveDoc;
 
             if (model == null ||
-                model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY || selectedPart == null)
+                model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
                 return;
+
+            string file;
+            Part part;
+
+            switch (treeListView1.SelectedObject)
+            {
+                case PartVariant variant:
+                    file = variant.SldprtPath;
+                    part = variant.Part;
+                    break;
+
+                case Part p:
+                    {
+                        var variants = VariantManager.GetVariants(p);
+
+                        if (variants.Count == 0)
+                        {
+                            DownloadPartList(new List<Part> { p });
+                            return;
+                        }
+
+                        if (variants.Count > 1)
+                        {
+                            MessageBox.Show("This part has multiple variants.");
+                            return;
+                        }
+
+                        file = variants[0].SldprtPath;
+                        part = p;
+                        break;
+                    }
+
+                default:
+                    return;
+            }
 
             _dragAssembly = (AssemblyDoc)model;
             _dragAssembly.FileDropPostNotify += OnFileDropPostNotify;
 
-
-            string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-
-            string stepDir = Path.Combine(appData, "FRITES Design", "Step");
-
-            string partDir = Path.Combine(stepDir, selectedPart.Sku);
-
-            if (!Directory.Exists(partDir))
-            {
-                DownloadPartList(new List<Part> { selectedPart });
-                return;
-            }
-
-            string file = Path.Combine(partDir, selectedPart.Sku + ".SLDPRT");
-
             PendingVirtualComponent = file;
-            PendingVirtualComponentPart = selectedPart;
+            PendingVirtualComponentPart = part;
 
             var data = new DataObject();
             data.SetData(DataFormats.FileDrop, new[] { file });
 
-
-            DragDropEffects result = DoDragDrop(data, DragDropEffects.Copy);
-
+            DoDragDrop(data, DragDropEffects.Copy);
         }
 
         private int OnFileDropPostNotify()

@@ -142,6 +142,7 @@
     <Compile Include="ImportRunner.cs" />
     <Compile Include="Part.cs" />
     <Compile Include="PartDownloader.cs" />
+    <Compile Include="PartVariant.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SolidworksLauncher.cs" />
   </ItemGroup>
