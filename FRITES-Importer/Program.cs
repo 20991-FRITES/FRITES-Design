@@ -1,9 +1,11 @@
 ﻿using FRITES.Core;
 using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 class Program
 {
@@ -16,10 +18,13 @@ class Program
 
             var sw = SolidworksLauncher.StartNewInstance();
 
-            sw.Visible = false;
-            sw.UserControl = false; 
-            
-            sw.Frame().KeepInvisible = true;
+
+            sw.Visible = true;
+            sw.UserControl = true;
+
+            sw.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
+            sw.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
+
 
             try
             {

@@ -96,9 +96,18 @@ namespace FRITES.Core
 
         public static string ImportStep(
     SldWorks swApp,
-    string SKU, string name,
-    string stepFile, bool preload = false, string swMaterial = null)
+    string SKU,
+    string name,
+    string stepFile,
+    bool preload = false,
+    string swMaterial = null)
         {
+
+            swApp.SetUserPreferenceToggle((int) swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect, true);
+
+            bool interconnect = swApp.GetUserPreferenceToggle(
+    (int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect);
+
             string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
 
             string partDirFinal = Path.Combine(
@@ -106,29 +115,35 @@ namespace FRITES.Core
                 "FRITES Design",
                 "Step",
                 SKU);
+
             string partDirTemp = partDirFinal + ".tmp";
 
             string savePath = Path.Combine(partDirTemp, SKU + ".sldprt");
 
             if (File.Exists(savePath))
+            {
                 return savePath;
+            }
 
             ImportStepData importData =
                 (ImportStepData)swApp.GetImportFileData(stepFile);
 
             importData.MapConfigurationData = true;
 
-
             int loadErrors = 0;
 
-            ModelDoc2 stepDoc =
-                (ModelDoc2)swApp.LoadFile4(
+
+            ModelDoc2 stepDoc = (ModelDoc2)swApp.LoadFile4(
                     stepFile,
-                    "r",
-                    importData,
+                    "",
+                    //"r",
+                    null,
                     ref loadErrors);
 
+
+
             if (stepDoc == null)
+                //throw new Exception($"Failed to load STEP file. Error {loadErrors}");
                 throw new Exception($"Failed to load STEP file. Error {loadErrors}");
 
             CustomPropertyManager props =
@@ -148,7 +163,6 @@ namespace FRITES.Core
 
             if (!string.IsNullOrWhiteSpace(swMaterial))
             {
-
                 var part = (PartDoc)stepDoc;
 
                 string installDir = Path.GetDirectoryName(swApp.GetExecutablePath());
@@ -186,13 +200,15 @@ namespace FRITES.Core
             {
                 try
                 {
-                    swApp.CloseDoc(stepDoc.GetTitle());
-                } catch (Exception ex) { 
-                    Debug.WriteLine("Failed to close STEP document.");
+                    string title = stepDoc.GetTitle();
+
+                    swApp.CloseDoc(title);
+                }
+                catch (Exception ex)
+                {
                     Debug.WriteLine(ex);
                 }
 
-                // Move the temp directory to the final directory if it doesn't exist
                 if (!Directory.Exists(partDirFinal))
                 {
                     try
@@ -201,12 +217,15 @@ namespace FRITES.Core
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Failed to move directory from {partDirTemp} to {partDirFinal}");
                         Debug.WriteLine(ex);
                     }
                 }
             }
-            if (!preload) return savePath;
+
+            if (!preload)
+            {
+                return savePath;
+            }
 
             int preloadErrors = 0;
             int preloadWarnings = 0;
@@ -219,11 +238,12 @@ namespace FRITES.Core
                 ref preloadErrors,
                 ref preloadWarnings);
 
+
             if (preloadDoc == null)
                 throw new Exception($"Failed to preload part. Error {preloadErrors}");
+
             return savePath;
         }
-
 
         private static async Task<bool> TryDownloadFileAsync(Uri uri, string destinationPath)
         {

@@ -16,6 +16,7 @@ namespace FRITES.Core
         {
             foreach (var job in jobs)
             {
+                Console.WriteLine($"START:{job.Sku}");
                 PartDownloader.ImportStep(
                     sw,
                     job.Sku,
