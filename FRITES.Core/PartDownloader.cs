@@ -129,7 +129,7 @@ namespace FRITES.Core
     new Dictionary<string, Dictionary<string, string>>
         {
             {
-                "5203-2402-0003",
+                "5203-2402-",
                 new Dictionary<string, string>
                 {
                     //{ 0, "MotorBlack.p2m" },
@@ -137,15 +137,33 @@ namespace FRITES.Core
                     //{ 2, "Steel.p2m" },
                     //{ 15, "Aluminum.p2m" },
                     //{ 24, "MotorBlack.p2m" }
-                    { "Boss-Extrude1[2]", "plastic\\high gloss\\yellow high gloss plastic.p2m" }
+                    { "Boss-Extrude1[2]", "plastic\\high gloss\\yellow high gloss plastic.p2m" }, // Yellow label
+                    { "Boss-Extrude5[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Gearbox housing
+                    { "Boss-Extrude6[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Gearbox housing
+                    { "Fillet3[1]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[2]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[3]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[4]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[5]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[6]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[7]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Fillet3[8]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                    { "Boss-Extrude1[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Connector end
+                    { "Fillet1[1]", "plastic\\high gloss\\black high gloss plastic.p2m" }, // Hex clip thingy
+                    { "CirPattern7[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Main body
+                    { "Chamfer4[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Top assembly
+                    { "Mirror5[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // axis holder thingy
+                    { "Cut-Extrude10[1]", "metal\\steel\\carbon steel.p2m" }, // Axis
                 }
             }
         };
 
         private static void FixPartAppearance(SldWorks swApp, PartDoc part, string sku)
         {
-            Dictionary<string, string> fixes;
-            if (!AppearanceFixes.TryGetValue(sku, out fixes))
+            var fixes = AppearanceFixes
+                .FirstOrDefault(x => sku.StartsWith(x.Key)).Value;
+
+            if (fixes == null)
                 return;
 
             object[] bodyObjects = part.GetBodies2(
