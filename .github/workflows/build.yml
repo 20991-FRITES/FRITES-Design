@@ -1,0 +1,32 @@
+name: Build Installer
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+
+    - name: Restore packages
+      run: nuget restore FRITES-Design.sln
+
+    - name: Build solution
+      run: msbuild FRITES-Design.sln /p:Configuration=Release
+
+    - name: Upload MSI
+      uses: actions/upload-artifact@v4
+      with:
+        name: FRITES-Design-Installer
+        path: Installer/bin/Release/*.msi
