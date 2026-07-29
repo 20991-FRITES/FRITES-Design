@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Wix
+    xmlns="http://wixtoolset.org/schemas/v4/wxs"
+    xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+    xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+	
+	<Package
+		Name="FRITES Design"
+		Manufacturer="FRITES"
+		Version="1.0.0"
+		UpgradeCode="{99601CE7-123E-40C7-9BA2-C7DFF5CDA234}">
+
+		<MajorUpgrade
+    DowngradeErrorMessage="A newer version of FRITES Design is already installed." />
+
+		<MediaTemplate EmbedCab="yes"/>
+
+		<StandardDirectory Id="ProgramFiles64Folder">
+			<Directory Id="INSTALLFOLDER" Name="FRITES Design"/>
+		</StandardDirectory>
+		
+		<ui:WixUI Id="WixUI_Minimal" />
+
+		<WixVariable
+    Id="WixUILicenseRtf"
+    Value="License.rtf" />
+
+		<Feature Id="MainFeature" Title="FRITES Design" Level="1">
+			<ComponentGroupRef Id="ApplicationFiles"/>
+			<ComponentGroupRef Id="RegistryEntries"/>
+		</Feature>
+
+		<SetProperty
+    Id="RegisterAddin"
+    Value="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FRITES Design.dll&quot; /codebase"
+    Before="RegisterAddin"
+    Sequence="execute" />
+
+		<CustomAction
+			Id="RegisterAddin"
+			BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+			DllEntry="WixQuietExec"
+			Execute="deferred"
+			Impersonate="no"
+			Return="check" />
+
+		<SetProperty
+			Id="UnregisterAddin"
+			Value="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; /u &quot;[INSTALLFOLDER]FRITES Design.dll&quot;"
+			Before="UnregisterAddin"
+			Sequence="execute" />
+
+		<CustomAction
+			Id="UnregisterAddin"
+			BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+			DllEntry="WixQuietExec"
+			Execute="deferred"
+			Impersonate="no"
+			Return="ignore" />
+
+		<InstallExecuteSequence>
+
+			<Custom Action="RegisterAddin"
+					After="InstallFiles"
+					Condition="NOT Installed" />
+
+			<Custom Action="UnregisterAddin"
+					Before="RemoveFiles"
+					Condition="REMOVE=&quot;ALL&quot;" />
+
+		</InstallExecuteSequence>
+	</Package>
+
+</Wix>

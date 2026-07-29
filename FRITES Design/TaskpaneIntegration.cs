@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 
 namespace FRITES_Design
 {
+    [Guid("DB8747A5-46E2-4C3B-8A2F-56019D5866D0")]
     public class TaskpaneIntegration : SwAddin
     {
         #region Private members

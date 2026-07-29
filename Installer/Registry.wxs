@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+
+    <ComponentGroup Id="RegistryEntries" Directory="INSTALLFOLDER">
+
+      <Component Id="SolidWorksAddinRegistry" Guid="*">
+
+        <RegistryKey
+            Root="HKLM"
+            Key="SOFTWARE\SolidWorks\AddIns\{YOUR-GUID}">
+
+          <RegistryValue
+              Type="integer"
+              Value="1"
+              KeyPath="yes"/>
+
+          <RegistryValue
+              Name="Title"
+              Type="string"
+              Value="FRITES Design"/>
+
+          <RegistryValue
+              Name="Description"
+              Type="string"
+              Value="FRITES Design library"/>
+
+        </RegistryKey>
+
+      </Component>
+
+      <Component Id="SolidWorksStartupRegistry" Guid="*">
+
+        <RegistryKey
+            Root="HKCU"
+            Key="Software\SolidWorks\AddInsStartup\{YOUR-GUID}">
+
+          <RegistryValue
+              Type="integer"
+              Value="1"
+              KeyPath="yes"/>
+
+        </RegistryKey>
+
+      </Component>
+
+    </ComponentGroup>
+
+  </Fragment>
+
+</Wix>

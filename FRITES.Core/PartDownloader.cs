@@ -33,6 +33,10 @@ namespace FRITES.Core
 
             string partDirFinal = Path.Combine(stepDir, part.Sku);
             string partDirTemp = partDirFinal + ".tmp";
+            if (Directory.Exists(partDirTemp))
+            { 
+                Directory.Delete(partDirTemp);
+            }
             Directory.CreateDirectory(partDirTemp);
 
             string localPartPath = Path.Combine(partDirTemp, part.Sku + ".sldprt");
@@ -132,11 +136,6 @@ namespace FRITES.Core
                 "5203-2402-",
                 new Dictionary<string, string>
                 {
-                    //{ 0, "MotorBlack.p2m" },
-                    //{ 1, "Steel.p2m" },
-                    //{ 2, "Steel.p2m" },
-                    //{ 15, "Aluminum.p2m" },
-                    //{ 24, "MotorBlack.p2m" }
                     { "Boss-Extrude1[2]", "plastic\\high gloss\\yellow high gloss plastic.p2m" }, // Yellow label
                     { "Boss-Extrude5[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Gearbox housing
                     { "Boss-Extrude6[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Gearbox housing
@@ -154,6 +153,37 @@ namespace FRITES.Core
                     { "Chamfer4[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Top assembly
                     { "Mirror5[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // axis holder thingy
                     { "Cut-Extrude10[1]", "metal\\steel\\carbon steel.p2m" }, // Axis
+                }
+            },
+            {
+                "REV-31-1153",
+                new Dictionary<string, string>
+                {
+                    { "REV-30012-222-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
+                    { "REV-50012-001-1/REV-50012-090-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
+                    { "REV-30012-002-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
+                    { "REV-50012-001-1/JST", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-31-1153.step<1>[4]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-001-1/WFD-PZ2_54-32AT-2_5MM-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-001-1/EDAC_690-005-299-043-1-solid1[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-001-1/AMASS_XT30UPB-M-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
+                    { "REV-50012-001-1/AMASS_XT30UPB-F-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
+                }
+            },
+            {
+                "REV-31-1595",
+                new Dictionary<string, string>
+                {
+                    { "REV-30012-222-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
+                    { "REV-50012-001-1/REV-50012-090-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
+                    { "REV-30012-002-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
+                    { "REV-50012-001-1/JST", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-31-1153.step<1>[4]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-001-1/WFD-PZ2_54-32AT-2_5MM-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-001-1/EDAC_690-005-299-043-1-solid1[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-002-1-solid3[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
+                    { "REV-50012-001-1/AMASS_XT30UPB-M-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
+                    { "REV-50012-001-1/AMASS_XT30UPB-F-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
                 }
             }
         };
@@ -175,23 +205,27 @@ namespace FRITES.Core
 
             foreach (var fix in fixes)
             {
-                string bodyName = fix.Key;
-
-                Body2 body = bodyObjects
+                var matchingBodies = bodyObjects
                     .Cast<Body2>()
-                    .FirstOrDefault(b => b != null && b.Name == bodyName);
+                    .Where(b => b != null &&
+                                b.Name.StartsWith(fix.Key, StringComparison.OrdinalIgnoreCase));
 
-                if (body == null)
+                bool found = false;
+
+                foreach (var body in matchingBodies)
                 {
-                    Debug.WriteLine($"Body '{bodyName}' not found.");
-                    continue;
+                    found = true;
+                    ApplyAppearance(
+                        swApp,
+                        fix.Value,
+                        (ModelDoc2)part,
+                        body);
                 }
 
-                ApplyAppearance(
-                    swApp,
-                    fix.Value,
-                    (ModelDoc2)part,
-                    body);
+                if (!found)
+                {
+                    Debug.WriteLine($"No body starting with '{fix.Key}' found.");
+                }
             }
         }
 
@@ -221,6 +255,7 @@ namespace FRITES.Core
 
             object entity = body;
 
+            
             if (!renderMat.AddEntity(entity))
                 throw new Exception("Failed to add body to render material.");
 
@@ -241,9 +276,16 @@ namespace FRITES.Core
     string swMaterial = null,
     string swFinish = null)
         {
+            bool was3dInterconnectEnabled = swApp.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect);
+            int previousImportNeutralAssemblyStructureMapping = swApp.GetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping);
+
             swApp.SetUserPreferenceToggle(
                 (int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect,
                 true);
+
+            swApp.SetUserPreferenceIntegerValue(
+    (int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping,
+    (int)swImportNeutralAssemblyStructureMapping_e.swImportNeutralAssemblyStructureMapping_MultibodyPart);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
 
@@ -368,6 +410,15 @@ namespace FRITES.Core
                 {
                     Debug.WriteLine(ex);
                 }
+
+                // RESTORE USER'S SETTINGS
+                swApp.SetUserPreferenceToggle(
+                (int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect,
+                was3dInterconnectEnabled);
+
+                swApp.SetUserPreferenceIntegerValue(
+        (int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping,
+        previousImportNeutralAssemblyStructureMapping);
             }
 
             if (!preload)

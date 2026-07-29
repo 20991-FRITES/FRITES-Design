@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+
+      <Files Include="..\FRITES Design\bin\$(Configuration)\**">
+
+        <!-- Debug symbols -->
+        <Exclude Files="**\*.pdb"/>
+
+        <!-- XML docs -->
+        <Exclude Files="**\*.xml"/>
+
+        <!-- Don't redistribute SOLIDWORKS PIAs -->
+        <Exclude Files="**\SolidWorks.Interop.*.dll"/>
+
+      </Files>
+
+    </ComponentGroup>
+
+  </Fragment>
+
+</Wix>

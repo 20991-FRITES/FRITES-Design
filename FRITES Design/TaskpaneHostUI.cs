@@ -22,6 +22,7 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace FRITES_Design
 {
+    [Guid("7BD24269-4244-4E18-8724-C783DBCE8A90")]
     [ProgId(TaskpaneIntegration.SWTASKPANE_PROGID)]
     public partial class TaskpaneHostUI : UserControl
     {
@@ -241,14 +242,22 @@ namespace FRITES_Design
     LoadingForm loading,
     List<ImportJob> jobs)
         {
+            var groups = jobs
+                .GroupBy(j => j.Sku)
+                .ToList();
+
             int workerCount = 4;
             var workerJobs = Enumerable.Range(0, workerCount)
                 .Select(_ => new List<ImportJob>())
                 .ToArray();
 
-            for (int i = 0; i < jobs.Count; i++)
+            int worker = 0;
+
+            foreach (var group in groups)
             {
-                workerJobs[i % workerCount].Add(jobs[i]);
+                workerJobs[worker].AddRange(group);
+
+                worker = (worker + 1) % workerCount;
             }
 
             string jobsFolder = Path.Combine(

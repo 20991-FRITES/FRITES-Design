@@ -1,0 +1,17 @@
+﻿<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <AcceptEula>wix7</AcceptEula>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="License.rtf" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FRITES Design\FRITES Design.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
+	</ItemGroup>
+</Project>
