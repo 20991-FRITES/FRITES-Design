@@ -23,7 +23,7 @@ jobs:
       run: nuget restore FRITES-Design.sln
 
     - name: Build solution
-      run: msbuild FRITES-Design.sln /p:Configuration=Release
+      run: msbuild FRITES-Design.slnx /p:Configuration=Release
 
     - name: Upload MSI
       uses: actions/upload-artifact@v4
