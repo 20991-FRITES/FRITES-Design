@@ -1,8 +1,12 @@
 name: Build Installer
 
 on:
+  workflow_dispatch:
+
   push:
-    branches: [ master ]
+    branches:
+      - master
+
   pull_request:
 
 jobs:
@@ -20,10 +24,10 @@ jobs:
       uses: NuGet/setup-nuget@v2
 
     - name: Restore packages
-      run: nuget restore FRITES-Design.slnx
+      run: nuget restore "FRITES Design.slnx"
 
     - name: Build solution
-      run: msbuild FRITES-Design.slnx /p:Configuration=Release
+      run: msbuild "FRITES Design.slnx" /p:Configuration=Release
 
     - name: Upload MSI
       uses: actions/upload-artifact@v4
