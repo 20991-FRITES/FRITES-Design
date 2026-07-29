@@ -121,6 +121,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(TargetPath)" "$(SolutionDir)FRITES Design\bin\Debug\"</PostBuildEvent>
+    <PostBuildEvent>copy /Y "$(TargetPath)" "$(SolutionDir)FRITES Design\bin\$(Configuration)\"</PostBuildEvent>
   </PropertyGroup>
 </Project>
