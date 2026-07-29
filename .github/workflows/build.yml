@@ -20,7 +20,7 @@ jobs:
       uses: NuGet/setup-nuget@v2
 
     - name: Restore packages
-      run: nuget restore FRITES-Design.sln
+      run: nuget restore FRITES-Design.slnx
 
     - name: Build solution
       run: msbuild FRITES-Design.slnx /p:Configuration=Release
