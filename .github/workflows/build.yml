@@ -33,4 +33,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: FRITES-Design-Installer
-        path: Installer/bin/Release/*.msi
+        path: Installer/bin/x64/Release/*.msi
