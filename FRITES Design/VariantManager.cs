@@ -21,6 +21,13 @@ namespace FRITES_Design
 
             return Directory
                 .EnumerateFiles(partDir, "*.sldprt", SearchOption.TopDirectoryOnly)
+                .Where(file =>
+                {
+                    var name = Path.GetFileNameWithoutExtension(file);
+
+                    return !name.StartsWith("~$") &&
+                           !name.StartsWith("~");
+                })
                 .Select(file => new PartVariant
                 {
                     Part = part,

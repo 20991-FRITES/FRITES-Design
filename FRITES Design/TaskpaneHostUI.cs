@@ -791,6 +791,7 @@ namespace FRITES_Design
                 case PartVariant variant:
                     file = variant.SldprtPath;
                     part = variant.Part;
+                    part.Sku = variant.Name;
                     break;
 
                 case Part p:
