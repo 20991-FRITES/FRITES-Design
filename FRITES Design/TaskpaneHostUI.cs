@@ -829,6 +829,22 @@ namespace FRITES_Design
 
             DoDragDrop(data, DragDropEffects.Copy);
         }
+        
+        private Component2 FindExistingVirtualComponent(AssemblyDoc assembly, string sku)
+        {
+            object[] components = (object[])assembly.GetComponents(false);
+
+            foreach (Component2 comp in components)
+            {
+                if (!comp.IsVirtual)
+                    continue;
+
+                if (string.Equals(comp.ComponentReference, sku, StringComparison.Ordinal))
+                    return comp;
+            }
+
+            return null;
+        }
 
         private int OnFileDropPostNotify()
         {
@@ -837,7 +853,7 @@ namespace FRITES_Design
                 return 0;
 
             object[] components = (object[])_dragAssembly.GetComponents(false);
-
+            
             foreach (Component2 comp in components)
             {
                 if (string.Equals(
@@ -845,15 +861,43 @@ namespace FRITES_Design
                 PendingVirtualComponent,
                 StringComparison.OrdinalIgnoreCase))
                 {
-                    bool success = comp.MakeVirtual2(true);
-                    comp.Name2 = PendingVirtualComponentPart.Sku;
-                    ModelDoc2 model = (ModelDoc2)comp.GetModelDoc2();
-                    CustomPropertyManager props =
+                    Component2 component = comp;
+                    
+                    Component2 existingVirtual = FindExistingVirtualComponent(_dragAssembly, PendingVirtualComponentPart.Sku);
+
+                    if (existingVirtual != null)
+                    {
+                        MathTransform t = comp.Transform2;
+
+                        comp.Select4(false, null, false);
+                        ((ModelDoc2)_dragAssembly).EditDelete();
+                        
+                        string path = existingVirtual.GetPathName();
+
+                        Component2 replacement = _dragAssembly.AddComponent5(
+                            path,
+                            (int)swAddComponentConfigOptions_e.swAddComponentConfigOptions_CurrentSelectedConfig,
+                            "",
+                            false,
+                            "",
+                            0, 0, 0);
+
+                        replacement.Transform2 = t;
+                        component = replacement;
+                    }
+                    else
+                    {
+                        component.MakeVirtual2(true);
+
+                        component.Name2 = PendingVirtualComponentPart.Sku;
+                        ModelDoc2 model = (ModelDoc2)component.GetModelDoc2();
+                        CustomPropertyManager props =
                             model.Extension.CustomPropertyManager[""];
 
-                    props.Set2("Part Number", PendingVirtualComponentPart.Sku);
-                    props.Set2("Description", PendingVirtualComponentPart.Name);
-                    comp.ComponentReference = PendingVirtualComponentPart.Sku;
+                        props.Set2("Part Number", PendingVirtualComponentPart.Sku);
+                        props.Set2("Description", PendingVirtualComponentPart.Name);
+                        component.ComponentReference = PendingVirtualComponentPart.Sku;
+                    }
 
                     //props.Set2("Vendor", PendingVirtualComponentPart.Vendor); TODO: Add Vendor property to Part class and database
                     break;

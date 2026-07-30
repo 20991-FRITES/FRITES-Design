@@ -1,4 +1,3 @@
 # FRITES Design
 
 README
-
