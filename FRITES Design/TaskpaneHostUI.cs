@@ -1,6 +1,4 @@
-﻿using BrightIdeasSoftware;
-using FRITES.Core;
-using FRITES_Design.Properties;
+﻿using FRITES.Core;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using System;
@@ -8,16 +6,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 
 namespace FRITES_Design
@@ -29,9 +23,8 @@ namespace FRITES_Design
         public SldWorks SwApp { get; set; }
         public DataManager dataManager { get; set; }
 
-        private object SelectedTreeObject => treeListView1.SelectedObject;
         private readonly Dictionary<string, Image> imageCache = new Dictionary<string, Image>();
-        private bool searching = false;
+        private bool searching;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, string lParam);
@@ -989,25 +982,6 @@ namespace FRITES_Design
             }
         }
 
-        private Component2 FindComponentByPath(AssemblyDoc assembly, string path)
-        {
-            object[] components = (object[])assembly.GetComponents(false);
-
-            foreach (Component2 component in components)
-            {
-                string componentPath = component.GetPathName();
-
-                if (string.Equals(
-                        Path.GetFullPath(componentPath),
-                        path,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return component;
-                }
-            }
-
-            return null;
-        }
 
         private void replacePart_Click(object sender, EventArgs e)
         {
@@ -1211,24 +1185,6 @@ namespace FRITES_Design
 
             return model.Extension.DeleteSelection2(
                 (int)swDeleteSelectionOptions_e.swDelete_Absorbed);
-        }
-
-        private bool SelectEntity(
-            Entity entity,
-            bool append)
-        {
-            if (entity == null)
-                return false;
-
-            SelectionMgr selMgr =
-                (SelectionMgr)SwApp.ActiveDoc.SelectionManager;
-
-            SelectData data =
-                (SelectData)selMgr.CreateSelectData();
-
-            data.Mark = 1;
-
-            return entity.Select4(append, data);
         }
 
 
@@ -2001,63 +1957,6 @@ namespace FRITES_Design
             }
 
             return recordedMates;
-        }
-
-        private void toolStripButton1_Click(object sender, EventArgs e)
-        {
-            ModelDoc2 model = SwApp.ActiveDoc;
-
-            if (model == null ||
-                model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
-            {
-                MessageBox.Show("Open an assembly.");
-                return;
-            }
-
-            AssemblyDoc assembly = (AssemblyDoc)model;
-
-            SelectionMgr selMgr =
-                (SelectionMgr)model.SelectionManager;
-
-            if (selMgr.GetSelectedObjectCount2(-1) != 2)
-            {
-                MessageBox.Show("Select exactly two faces.");
-                return;
-            }
-
-            if (selMgr.GetSelectedObjectType3(1, -1) !=
-                (int)swSelectType_e.swSelFACES ||
-                selMgr.GetSelectedObjectType3(2, -1) !=
-                (int)swSelectType_e.swSelFACES)
-            {
-                MessageBox.Show("Select two faces.");
-                return;
-            }
-
-            int errors;
-
-            Mate2 mate = assembly.AddMate5(
-                (int)swMateType_e.swMateCOINCIDENT,
-                (int)swMateAlign_e.swMateAlignALIGNED,
-                false, // Flip
-                0.0, // Distance
-                0.0, // Distance upper
-                0.0, // Distance lower
-                0.0, // Gear numerator
-                0.0, // Gear denominator
-                0.0, // Angle
-                0.0, // Angle upper
-                0.0, // Angle lower
-                false, // For positioning only
-                false, // Lock rotation
-                0, // Width mate option
-                out errors);
-
-            model.ClearSelection2(true);
-            model.EditRebuild3();
-
-            MessageBox.Show(
-                $"Mate = {(mate != null)}\nErrors = {errors}");
         }
     }
 }
