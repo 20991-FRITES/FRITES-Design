@@ -16,6 +16,10 @@ namespace FRITES_Design
 
         #region Component Designer generated code
 
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
@@ -28,12 +32,14 @@ namespace FRITES_Design
             this.downloadButton = new System.Windows.Forms.ToolStripButton();
             this.deleteButton = new System.Windows.Forms.ToolStripButton();
             this.openInBrowserButton = new System.Windows.Forms.ToolStripButton();
+            this.replacePart = new System.Windows.Forms.ToolStripButton();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.searchTextBox = new System.Windows.Forms.TextBox();
             this.treeListView1 = new BrightIdeasSoftware.TreeListView();
-            this.PartName = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
-            this.SKU = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
-            this.downloaded = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
+            this.PartName = new BrightIdeasSoftware.OLVColumn();
+            this.SKU = new BrightIdeasSoftware.OLVColumn();
+            this.downloaded = new BrightIdeasSoftware.OLVColumn();
+            this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
             this.toolStrip1.SuspendLayout();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.treeListView1)).BeginInit();
@@ -53,12 +59,7 @@ namespace FRITES_Design
             // 
             this.toolStrip1.AutoSize = false;
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(32, 32);
-            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.updatePartListButton,
-            this.refreshButton,
-            this.downloadButton,
-            this.deleteButton,
-            this.openInBrowserButton});
+            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { this.updatePartListButton, this.refreshButton, this.downloadButton, this.deleteButton, this.openInBrowserButton, this.replacePart, this.toolStripButton1 });
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(907, 78);
@@ -119,6 +120,17 @@ namespace FRITES_Design
             this.openInBrowserButton.Text = "Open in browser";
             this.openInBrowserButton.Click += new System.EventHandler(this.openInBrowserButton_Click);
             // 
+            // replacePart
+            // 
+            this.replacePart.AutoSize = false;
+            this.replacePart.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.replacePart.Image = ((System.Drawing.Image)(resources.GetObject("replacePart.Image")));
+            this.replacePart.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.replacePart.Name = "replacePart";
+            this.replacePart.Size = new System.Drawing.Size(60, 60);
+            this.replacePart.Text = "Smart Replace";
+            this.replacePart.Click += new System.EventHandler(this.replacePart_Click);
+            // 
             // tableLayoutPanel1
             // 
             this.tableLayoutPanel1.BackColor = System.Drawing.SystemColors.Window;
@@ -157,10 +169,7 @@ namespace FRITES_Design
             this.treeListView1.AllColumns.Add(this.downloaded);
             this.treeListView1.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.treeListView1.CellEditUseWholeCell = false;
-            this.treeListView1.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
-            this.PartName,
-            this.SKU,
-            this.downloaded});
+            this.treeListView1.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] { this.PartName, this.SKU, this.downloaded });
             this.treeListView1.Cursor = System.Windows.Forms.Cursors.Default;
             this.treeListView1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.treeListView1.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -194,6 +203,16 @@ namespace FRITES_Design
             this.downloaded.Text = "Downloaded";
             this.downloaded.Width = 90;
             // 
+            // toolStripButton1
+            // 
+            this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton1.Image")));
+            this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton1.Name = "toolStripButton1";
+            this.toolStripButton1.Size = new System.Drawing.Size(36, 75);
+            this.toolStripButton1.Text = "toolStripButton1";
+            this.toolStripButton1.Click += new System.EventHandler(this.toolStripButton1_Click);
+            // 
             // TaskpaneHostUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
@@ -211,8 +230,11 @@ namespace FRITES_Design
             this.tableLayoutPanel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.treeListView1)).EndInit();
             this.ResumeLayout(false);
-
         }
+
+        private System.Windows.Forms.ToolStripButton toolStripButton1;
+
+        private System.Windows.Forms.ToolStripButton replacePart;
 
         #endregion
 
