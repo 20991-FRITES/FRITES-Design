@@ -1140,9 +1140,6 @@ namespace FRITES_Design
 
                         double[] box = (double[])face.GetBox();
 
-                        Debug.WriteLine(
-                            $"{box[3] - box[0]} x {box[4] - box[1]} x {box[5] - box[2]}");
-
                         return face as Entity;
                     }
 
@@ -1336,7 +1333,7 @@ namespace FRITES_Design
             RecordedMate mate)
         {
             Debug.WriteLine("========================================");
-            Debug.WriteLine($"Recreating {mate.Type}");
+            Debug.WriteLine($"Recreating {(swMateType_e)mate.Type}");
 
             if (mate.Entities.Count != 2)
                 return false;
@@ -1377,50 +1374,74 @@ namespace FRITES_Design
 
             model.ClearSelection2(true);
 
-            bool s1 = entity1.Select4(false, null);
-            bool s2 = entity2.Select4(true, null);
-
-            Debug.WriteLine($"Select1 = {s1}");
-            Debug.WriteLine($"Select2 = {s2}");
-
-            if (!s1 || !s2)
+            if (!entity1.Select4(false, null) ||
+                !entity2.Select4(true, null))
+            {
+                model.ClearSelection2(true);
                 return false;
+            }
 
             //----------------------------------------
-            // Create mate
+            // Determine mate value
             //----------------------------------------
 
-            int errors = 0;
-            Mate2 newMate = null;
+            double mateValue = 0.0;
+
+            switch ((swMateType_e)mate.Type)
+            {
+                case swMateType_e.swMateDISTANCE:
+                case swMateType_e.swMateANGLE:
+                    mateValue = mate.Dimension;
+                    break;
+            }
+
+            //----------------------------------------
+            // Supported mate types
+            //----------------------------------------
 
             switch ((swMateType_e)mate.Type)
             {
                 case swMateType_e.swMateCOINCIDENT:
-
-                    newMate = assembly.AddMate5(
-                        (int)swMateType_e.swMateCOINCIDENT,
-                        (int)mate.Alignment,
-                        false, // Flip
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        false,
-                        false,
-                        0,
-                        out errors);
+                case swMateType_e.swMateCONCENTRIC:
+                case swMateType_e.swMatePARALLEL:
+                case swMateType_e.swMatePERPENDICULAR:
+                case swMateType_e.swMateTANGENT:
+                case swMateType_e.swMateDISTANCE:
+                case swMateType_e.swMateANGLE:
+                case swMateType_e.swMateLOCK:
+                case swMateType_e.swMateSYMMETRIC:
 
                     break;
 
                 default:
 
-                    Debug.WriteLine($"Unsupported mate type: {mate.Type}");
+                    Debug.WriteLine($"Unsupported mate type: {(swMateType_e)mate.Type}");
+                    model.ClearSelection2(true);
                     return false;
             }
+
+            //----------------------------------------
+            // Create mate
+            //----------------------------------------
+
+            int errors;
+
+            Mate2 newMate = assembly.AddMate5(
+                (int) mate.Type,
+                (int) mate.Alignment,
+                mate.Flipped, // Flip
+                mateValue,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                false,
+                mate.RotationLocked,
+                0,
+                out errors);
 
             model.ClearSelection2(true);
 
@@ -1802,25 +1823,6 @@ namespace FRITES_Design
             return (point - min) / size;
         }
 
-        private static double CenterDifference(
-            double[] a,
-            double[] b)
-        {
-            return
-                Math.Abs(a[0] - b[0]) +
-                Math.Abs(a[1] - b[1]) +
-                Math.Abs(a[2] - b[2]);
-        }
-
-        private static double Distance(double[] a, double[] b)
-        {
-            double dx = a[0] - b[0];
-            double dy = a[1] - b[1];
-            double dz = a[2] - b[2];
-
-            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
-        }
-
         private List<RecordedMate> CaptureMates(
             ModelDoc2 model,
             Component2 targetComponent)
@@ -1847,6 +1849,14 @@ namespace FRITES_Design
 
                     if (mate != null)
                     {
+                        bool rotationLocked = false;
+
+                        if ((swMateType_e)mate.Type == swMateType_e.swMateCONCENTRIC)
+                        {
+                            var def = (IConcentricMateFeatureData)mateFeature.GetDefinition();
+                            rotationLocked = def.LockRotation;
+                        }
+                        
                         RecordedMate recorded = new RecordedMate
                         {
                             OriginalFeature = mateFeature,
@@ -1855,6 +1865,7 @@ namespace FRITES_Design
                             Alignment = (swMateAlign_e)mate.Alignment,
 
                             Flipped = mate.Flipped,
+                            RotationLocked = rotationLocked,
                             CanBeFlipped = mate.CanBeFlipped,
 
                             MaximumVariation = mate.MaximumVariation,

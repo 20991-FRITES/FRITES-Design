@@ -12,6 +12,7 @@ namespace FRITES_Design
 
         public bool Flipped;
         public bool CanBeFlipped;
+        public bool RotationLocked;
 
         // Distance / Angle mates
         public double Dimension;
