@@ -193,6 +193,9 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Resources\Folder-open.ico" />
+    <Content Include="Resources\Folder-closed.ico" />
+    <Content Include="Resources\green-check.ico" />
     <Content Include="taskpane_icons\icon_128x128.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

@@ -52,6 +52,7 @@ namespace FRITES_Design
             SendMessage(searchTextBox.Handle, EM_SETCUEBANNER, 0, "Search...");
 
             imageList1.Images.Add("folder", Properties.Resources.folder);
+            imageList1.Images.Add("folder-open", Properties.Resources.folder_open);
             imageList1.Images.Add("check", Properties.Resources.check);
 
             treeListView1.ChildrenGetter = GetTreeChildren;
@@ -108,7 +109,10 @@ namespace FRITES_Design
         private object GetPartNameImage(object x)
         {
             if (x is Category)
-                return "folder";
+            {
+                bool expanded = treeListView1.IsExpanded(x);
+                return expanded ? "folder-open" : "folder";
+            }
 
             if (x is Part p)
             {
