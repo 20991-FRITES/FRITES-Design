@@ -5,7 +5,7 @@ namespace FRITES_Design
     partial class TaskpaneHostUI
     {
         private System.ComponentModel.IContainer components = null;
-
+        
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -123,7 +123,7 @@ namespace FRITES_Design
             this.replacePart.Name = "replacePart";
             this.replacePart.Size = new System.Drawing.Size(46, 46);
             this.replacePart.Text = "Smart Replace";
-            this.replacePart.Click += new System.EventHandler(this.replacePart_Click);
+            this.replacePart.Click += new System.EventHandler(replacePart_Click);
             // 
             // tableLayoutPanel1
             // 

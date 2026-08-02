@@ -135,8 +135,6 @@
   <ItemGroup>
     <Compile Include="Category.cs" />
     <Compile Include="DataManager.cs" />
-    <Compile Include="EdgeSignature.cs" />
-    <Compile Include="FaceSignature.cs" />
     <Compile Include="LibrarySetupForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -161,8 +159,14 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Include="RecordedMate.cs" />
-    <Compile Include="RecordedMateEntity.cs" />
+    <Compile Include="SmartReplace.cs" />
+    <Compile Include="SmartReplace\EdgeSignature.cs" />
+    <Compile Include="SmartReplace\FaceSignature.cs" />
+    <Compile Include="SmartReplace\GeometryMatcher.cs" />
+    <Compile Include="SmartReplace\RecordedMate.cs" />
+    <Compile Include="SmartReplace\RecordedMateEntity.cs" />
+    <Compile Include="SmartReplace\SignatureBuilder.cs" />
+    <Compile Include="SmartReplace\VertexSignature.cs" />
     <Compile Include="TaskpaneHostUI.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -172,7 +176,6 @@
     <Compile Include="TaskpaneIntegration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="VariantManager.cs" />
-    <Compile Include="VertexSignature.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="LibrarySetupForm.resx">
