@@ -1101,6 +1101,24 @@ namespace FRITES_Design
                 //--------------------------------------------------
 
                 bool wasFixed = component.IsFixed();
+                
+                var otherComponents = GetAllComponents(model)
+                    .Where(c => c != component)
+                    .ToList();
+
+                var originalFixedStates = otherComponents
+                    .ToDictionary(c => c, c => c.IsFixed());
+
+                foreach (var c in otherComponents)
+                {
+                    if (!c.IsFixed())
+                    {
+                        model.ClearSelection2(true);
+                        c.Select4(false, null, false);
+                        assembly.FixComponent();
+                    }
+                }
+
 
                 //--------------------------------------------------
                 // Capture mates
@@ -1226,17 +1244,52 @@ namespace FRITES_Design
                     component.Select4(false, null, false);
                     assembly.UnfixComponent();
                 }
+                
+                foreach (var kvp in originalFixedStates)
+                {
+                    if (!kvp.Value) // wasn't fixed originally
+                    {
+                        model.ClearSelection2(true);
+                        kvp.Key.Select4(false, null, false);
+                        assembly.UnfixComponent();
+                    }
+                }
 
                 loadingForm.SetLabel("Done.");
                 loadingForm.SetProgress(100);
                 Application.DoEvents();
 
+                loadingForm.Close();
+                
                 MessageBox.Show(
-                    $"Finished.\n\nRecreated {repaired} mates.");
+                    $"Finished.\n\nRecreated {repaired} mates.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             finally
             {
                 loadingForm.Close();
+                
+                
+            }
+        }
+
+        private IEnumerable<Component2> GetAllComponents(ModelDoc2 model)
+        {
+            AssemblyDoc assembly = model as AssemblyDoc;
+
+            if (assembly == null)
+                yield break;
+
+            object[] comps = (object[])assembly.GetComponents(false);
+
+            if (comps == null)
+                yield break;
+
+            foreach (Component2 comp in comps)
+            {
+                if (comp.IsSuppressed())
+                    continue;
+
+                yield return comp;
             }
         }
 

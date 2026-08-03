@@ -62,35 +62,33 @@ namespace FRITES_Design
             EdgeSignature a,
             EdgeSignature b)
         {
-            double score = 0;
-
             if (a.CurveType != b.CurveType)
                 return double.MinValue;
 
-            score -= Math.Abs(a.Length - b.Length) * 1000.0;
+            double dx = a.MidPoint[0] - b.MidPoint[0];
+            double dy = a.MidPoint[1] - b.MidPoint[1];
+            double dz = a.MidPoint[2] - b.MidPoint[2];
 
-            double dx =
-                a.MidPoint[0] - b.MidPoint[0];
+            double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
 
-            double dy =
-                a.MidPoint[1] - b.MidPoint[1];
+            double score = 0;
 
-            double dz =
-                a.MidPoint[2] - b.MidPoint[2];
+            // Distance is the primary discriminator — squared, so far
+            // candidates get punished far harder than close ones.
+            score -= (distance * distance) * 1000.0;
 
-            score -= Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            // Secondary signals only matter as tiebreakers among
+            // otherwise-similar-distance candidates.
+            score -= Math.Abs(a.Length - b.Length) * 10.0;
 
             if (a.CurveType == swCurveTypes_e.LINE_TYPE)
             {
-                score +=
-                    100.0 *
-                    Math.Abs(Dot(a.Direction, b.Direction));
+                score += 5.0 * Math.Abs(Dot(a.Direction, b.Direction));
             }
 
             if (a.CurveType == swCurveTypes_e.CIRCLE_TYPE)
             {
-                score -=
-                    Math.Abs(a.Radius - b.Radius) * 1000.0;
+                score -= Math.Abs(a.Radius - b.Radius) * 10.0;
             }
 
             return score;
@@ -204,17 +202,7 @@ namespace FRITES_Design
                     .ThenBy(x =>
                         Math.Abs(x.Sig.Extent1 - original.Extent1) +
                         Math.Abs(x.Sig.Extent2 - original.Extent2));
-
-
-                foreach (var c in ranked.Take(20))
-                {
-                    Debug.WriteLine(
-                        $"Offset={Math.Abs(c.Sig.PlaneOffset - original.PlaneOffset):F4}  " +
-                        $"Ext={c.Sig.Extent1:F4} x {c.Sig.Extent2:F4}");
-                }
-
-                Debug.WriteLine($"Final candidates: {candidates.Count}");
-
+                
                 return ranked.First().Face;
             }
 
