@@ -1112,6 +1112,7 @@ namespace FRITES_Design
             }
 
             component.MakeVirtual2(true);
+            component.Name2 = replacement.Sku;
 
             model.ClearSelection2(true);
 
