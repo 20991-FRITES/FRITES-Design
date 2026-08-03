@@ -23,6 +23,7 @@ namespace FRITES_Design
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.Windows.Forms.ToolStripButton revertButton;
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(TaskpaneHostUI));
             this.sqLiteCommand1 = new System.Data.SQLite.SQLiteCommand();
             this.imageList1 = new System.Windows.Forms.ImageList(this.components);
@@ -39,10 +40,22 @@ namespace FRITES_Design
             this.PartName = new BrightIdeasSoftware.OLVColumn();
             this.SKU = new BrightIdeasSoftware.OLVColumn();
             this.downloaded = new BrightIdeasSoftware.OLVColumn();
+            this.revertButton = new System.Windows.Forms.ToolStripButton();
             this.toolStrip1.SuspendLayout();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.treeListView1)).BeginInit();
             this.SuspendLayout();
+            // 
+            // revertButton
+            // 
+            this.revertButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.revertButton.Enabled = false;
+            this.revertButton.Image = ((System.Drawing.Image)(resources.GetObject("revertButton.Image")));
+            this.revertButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.revertButton.Name = "revertButton";
+            this.revertButton.Size = new System.Drawing.Size(46, 46);
+            this.revertButton.Text = "toolStripButton1";
+            this.revertButton.Click += new System.EventHandler(this.revertButton_Click);
             // 
             // sqLiteCommand1
             // 
@@ -59,7 +72,7 @@ namespace FRITES_Design
             this.toolStrip1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(247)))), ((int)(((byte)(247)))), ((int)(((byte)(247)))));
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(42, 42);
             this.toolStrip1.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { this.updatePartListButton, this.refreshButton, this.downloadButton, this.deleteButton, this.openInBrowserButton, this.replacePart });
+            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { this.updatePartListButton, this.refreshButton, this.downloadButton, this.deleteButton, this.openInBrowserButton, this.replacePart, this.revertButton });
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(907, 49);
@@ -123,7 +136,7 @@ namespace FRITES_Design
             this.replacePart.Name = "replacePart";
             this.replacePart.Size = new System.Drawing.Size(46, 46);
             this.replacePart.Text = "Smart Replace";
-            this.replacePart.Click += new System.EventHandler(replacePart_Click);
+            this.replacePart.Click += new System.EventHandler(this.replacePart_Click);
             // 
             // tableLayoutPanel1
             // 
@@ -238,5 +251,6 @@ namespace FRITES_Design
         private System.Windows.Forms.ToolStripButton downloadButton;
         private System.Windows.Forms.ToolStripButton deleteButton;
         private System.Windows.Forms.ToolStripButton openInBrowserButton;
+        private System.Windows.Forms.ToolStripButton revertButton;
     }
 }

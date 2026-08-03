@@ -33,13 +33,15 @@ namespace FRITES_Design
 
         public string PendingVirtualComponent { get; private set; }
         public Part PendingVirtualComponentPart { get; private set; }
-        
+
         private PreviewForm preview = new PreviewForm();
 
         private object lastHoveredModel = null;
 
         private AssemblyDoc _dragAssembly;
 
+        private readonly Stack<string> _backupStack = new Stack<string>();
+        
         public TaskpaneHostUI()
         {
             InitializeComponent();
@@ -986,6 +988,28 @@ namespace FRITES_Design
             }
         }
 
+        private string CreateBackup(ModelDoc2 model)
+        {
+            string backupPath = Path.Combine(
+                Path.GetTempPath(),
+                Path.GetFileNameWithoutExtension(model.GetPathName())
+                + "_backup_" + Guid.NewGuid().ToString("N") + ".sldasm");
+
+            int errors = 0, warnings = 0;
+
+            bool saved = model.Extension.SaveAs3(
+                backupPath,
+                (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                (int)swSaveAsOptions_e.swSaveAsOptions_Copy,
+                null, null,
+                ref errors, ref warnings);
+
+            if (!saved)
+                throw new InvalidOperationException("Failed to create backup.");
+
+            return backupPath;
+        }
+        
         private void replacePart_Click(object sender, EventArgs e)
         {
             ModelDoc2 model = SwApp.ActiveDoc;
@@ -1028,106 +1052,162 @@ namespace FRITES_Design
                 return;
             }
 
-            ModelDocExtension extension = model.Extension;
-            extension.StartRecordingUndoObject();
-            
+            // ------------------------------------------------
+            // Save a backup of the assembly in case the user wants to revert or the operation doesn't work properly
+            // ------------------------------------------------
+
+            string backupPath;
             try
             {
-
-                string replacementPath =
-                    VariantManager.GetVariants(replacement)
-                        .First()
-                        .SldprtPath;
-
-                //--------------------------------------------------
-                // Remember whether the component was already fixed
-                //--------------------------------------------------
-
-                bool wasFixed = component.IsFixed();
-
-                //--------------------------------------------------
-                // Capture mates
-                //--------------------------------------------------
-
-                List<RecordedMate> mates = SmartReplace.CaptureMates(model, component);
-
-                //--------------------------------------------------
-                // Replace component
-                //--------------------------------------------------
-
-                model.ClearSelection2(true);
-
-                component.Select4(false, null, false);
-
-                bool success =
-                    assembly.ReplaceComponents2(
-                        replacementPath,
-                        "",
-                        false,
-                        (int)swReplaceComponentsConfiguration_e
-                            .swReplaceComponentsConfiguration_MatchName,
-                        true);
-
-                if (!success)
-                {
-                    MessageBox.Show("ReplaceComponents2 failed.");
-                    return;
-                }
-
-                model.ClearSelection2(true);
-
-                component.Select4(false, null, false);
-
-                // Only fix it if it wasn't already fixed
-                if (!wasFixed)
-                {
-                    assembly.FixComponent();
-                }
-
-                //--------------------------------------------------
-                // Recreate mates
-                //--------------------------------------------------
-
-                int repaired = 0;
-
-                foreach (RecordedMate mate in mates)
-                {
-                    try
-                    {
-                        if (SmartReplace.RecreateMate(
-                                assembly,
-                                model,
-                                component,
-                                mate))
-                        {
-                            repaired++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(ex);
-                    }
-                }
-
-                model.EditRebuild3();
-
-                //--------------------------------------------------
-                // Restore original fixed state
-                //--------------------------------------------------
-
-                if (!wasFixed)
-                {
-                    model.ClearSelection2(true);
-                    component.Select4(false, null, false);
-                    assembly.UnfixComponent();
-                }
-
-                MessageBox.Show(
-                    $"Finished.\n\nRecreated {repaired} mates.");
-            } finally
-            {
-                bool ended = extension.FinishRecordingUndoObject2("Smart Replace", false);
+                backupPath = CreateBackup(model);
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not create backup — aborting replace.\n" + ex.Message);
+                return;
+            }
+            _backupStack.Push(backupPath);
+            revertButton.Enabled = true;
+            
+            
+
+            string replacementPath =
+                VariantManager.GetVariants(replacement)
+                    .First()
+                    .SldprtPath;
+
+            //--------------------------------------------------
+            // Remember whether the component was already fixed
+            //--------------------------------------------------
+
+            bool wasFixed = component.IsFixed();
+
+            //--------------------------------------------------
+            // Capture mates
+            //--------------------------------------------------
+
+            List<RecordedMate> mates = SmartReplace.CaptureMates(model, component);
+
+            //--------------------------------------------------
+            // Replace component
+            //--------------------------------------------------
+
+            model.ClearSelection2(true);
+
+            component.Select4(false, null, false);
+
+            bool success =
+                assembly.ReplaceComponents2(
+                    replacementPath,
+                    "",
+                    false,
+                    (int)swReplaceComponentsConfiguration_e
+                        .swReplaceComponentsConfiguration_MatchName,
+                    true);
+
+            if (!success)
+            {
+                MessageBox.Show("ReplaceComponents2 failed.");
+                return;
+            }
+
+            component.MakeVirtual2(true);
+
+            model.ClearSelection2(true);
+
+            component.Select4(false, null, false);
+
+            // Only fix it if it wasn't already fixed
+            if (!wasFixed)
+            {
+                assembly.FixComponent();
+            }
+
+            //--------------------------------------------------
+            // Recreate mates
+            //--------------------------------------------------
+
+            int repaired = 0;
+
+            foreach (RecordedMate mate in mates)
+            {
+                try
+                {
+                    if (SmartReplace.RecreateMate(
+                            assembly,
+                            model,
+                            component,
+                            mate))
+                    {
+                        repaired++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                }
+            }
+
+            model.EditRebuild3();
+
+            //--------------------------------------------------
+            // Restore original fixed state
+            //--------------------------------------------------
+
+            if (!wasFixed)
+            {
+                model.ClearSelection2(true);
+                component.Select4(false, null, false);
+                assembly.UnfixComponent();
+            }
+
+            MessageBox.Show(
+                $"Finished.\n\nRecreated {repaired} mates.");
+        }
+
+        private void revertButton_Click(object sender, EventArgs e)
+        {
+            if (_backupStack.Count == 0)
+            {
+                MessageBox.Show("Nothing to revert.");
+                return;
+            }
+
+            ModelDoc2 model = SwApp.ActiveDoc;
+            if (model == null) return;
+
+            string originalPath = model.GetPathName();
+            string docTitle = model.GetTitle();
+            string backupPath = _backupStack.Pop();
+
+            try
+            {
+                SwApp.CloseDoc(docTitle);
+
+                File.Copy(backupPath, originalPath, overwrite: true);
+
+                int errors = 0, warnings = 0;
+                ModelDoc2 reopened = SwApp.OpenDoc6(
+                    originalPath,
+                    (int)swDocumentTypes_e.swDocASSEMBLY,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    "", ref errors, ref warnings);
+
+                if (reopened == null)
+                    MessageBox.Show("Revert failed to reopen the document.");
+            }
+            finally
+            {
+                // backup for this level is no longer needed
+                TryDeleteFile(backupPath);
+                
+                revertButton.Enabled = _backupStack.Count != 0;
+            }
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try { File.Delete(path); } catch { /* best effort */ }
         }
     }
 }
