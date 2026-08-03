@@ -713,8 +713,8 @@ namespace FRITES_Design
         {
             const double AverageSecondsPerPart = 12.0;
 
-            SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
-            SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
+            // SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
+            // SwApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
 
             try
             {
@@ -780,8 +780,8 @@ namespace FRITES_Design
                 loading.Close();
                 loading.Dispose();
 
-                SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
-                SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
+                // SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
+                // SwApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocASSEMBLY);
             }
         }
 

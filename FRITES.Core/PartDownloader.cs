@@ -19,6 +19,7 @@ namespace FRITES.Core
     {
         private const int DownloadTimeoutSeconds = 180;
         private const int DownloadRetryCount = 3;
+
         private static readonly HttpClient _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(DownloadTimeoutSeconds)
@@ -34,9 +35,10 @@ namespace FRITES.Core
             string partDirFinal = Path.Combine(stepDir, part.Sku);
             string partDirTemp = partDirFinal + ".tmp";
             if (Directory.Exists(partDirTemp))
-            { 
+            {
                 Directory.Delete(partDirTemp);
             }
+
             Directory.CreateDirectory(partDirTemp);
 
             string localPartPath = Path.Combine(partDirTemp, part.Sku + ".sldprt");
@@ -130,63 +132,117 @@ namespace FRITES.Core
         }
 
         private static readonly Dictionary<string, Dictionary<string, string>> AppearanceFixes =
-    new Dictionary<string, Dictionary<string, string>>
-        {
+            new Dictionary<string, Dictionary<string, string>>
             {
-                "5203-2402-",
-                new Dictionary<string, string>
                 {
-                    { "Boss-Extrude1[2]", "plastic\\high gloss\\yellow high gloss plastic.p2m" }, // Yellow label
-                    { "Boss-Extrude5[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Gearbox housing
-                    { "Boss-Extrude6[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Gearbox housing
-                    { "Fillet3[1]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[2]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[3]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[4]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[5]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[6]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[7]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Fillet3[8]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
-                    { "Boss-Extrude1[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m" }, // Connector end
-                    { "Fillet1[1]", "plastic\\high gloss\\black high gloss plastic.p2m" }, // Hex clip thingy
-                    { "CirPattern7[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Main body
-                    { "Chamfer4[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Top assembly
-                    { "Mirror5[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // axis holder thingy
-                    { "Cut-Extrude10[1]", "metal\\steel\\carbon steel.p2m" }, // Axis
-                }
-            },
-            {
-                "REV-31-1153",
-                new Dictionary<string, string>
+                    "5203-2402-",
+                    new Dictionary<string, string>
+                    {
+                        { "Boss-Extrude1[2]", "plastic\\high gloss\\yellow high gloss plastic.p2m" }, // Yellow label
+                        {
+                            "Boss-Extrude5[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m"
+                        }, // Gearbox housing
+                        {
+                            "Boss-Extrude6[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m"
+                        }, // Gearbox housing
+                        { "Fillet3[1]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[2]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[3]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[4]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[5]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[6]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[7]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        { "Fillet3[8]", "metal\\iron\\wrought iron.p2m" }, // Gearbox screw
+                        {
+                            "Boss-Extrude1[1]", "plastic\\high gloss\\dark grey high gloss plastic.p2m"
+                        }, // Connector end
+                        { "Fillet1[1]", "plastic\\high gloss\\black high gloss plastic.p2m" }, // Hex clip thingy
+                        { "CirPattern7[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Main body
+                        { "Chamfer4[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // Top assembly
+                        { "Mirror5[1]", "metal\\aluminum\\satin finish aluminum.p2m" }, // axis holder thingy
+                        { "Cut-Extrude10[1]", "metal\\steel\\carbon steel.p2m" }, // Axis
+                    }
+                },
                 {
-                    { "REV-30012-222-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
-                    { "REV-50012-001-1/REV-50012-090-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
-                    { "REV-30012-002-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
-                    { "REV-50012-001-1/JST", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-31-1153.step<1>[4]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-001-1/WFD-PZ2_54-32AT-2_5MM-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-001-1/EDAC_690-005-299-043-1-solid1[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-001-1/AMASS_XT30UPB-M-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
-                    { "REV-50012-001-1/AMASS_XT30UPB-F-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
-                }
-            },
-            {
-                "REV-31-1595",
-                new Dictionary<string, string>
+                    "REV-31-1153",
+                    new Dictionary<string, string>
+                    {
+                        {
+                            "REV-30012-222-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Main case
+                        {
+                            "REV-50012-001-1/REV-50012-090-1-solid1[1]",
+                            "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Main case
+                        {
+                            "REV-30012-002-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Main case
+                        {
+                            "REV-50012-001-1/JST", "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-31-1153.step<1>[4]", "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-001-1/WFD-PZ2_54-32AT-2_5MM-1-solid1[1]",
+                            "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-001-1/EDAC_690-005-299-043-1-solid1[1]",
+                            "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-001-1/AMASS_XT30UPB-M-1-solid1[1]",
+                            "plastic\\medium gloss\\yellow medium gloss plastic.p2m"
+                        }, // Power plug
+                        {
+                            "REV-50012-001-1/AMASS_XT30UPB-F-1-solid1[1]",
+                            "plastic\\medium gloss\\yellow medium gloss plastic.p2m"
+                        }, // Power plug
+                    }
+                },
                 {
-                    { "REV-30012-222-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
-                    { "REV-50012-001-1/REV-50012-090-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
-                    { "REV-30012-002-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Main case
-                    { "REV-50012-001-1/JST", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-31-1153.step<1>[4]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-001-1/WFD-PZ2_54-32AT-2_5MM-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-001-1/EDAC_690-005-299-043-1-solid1[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-002-1-solid3[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m" }, // Connectors
-                    { "REV-50012-001-1/AMASS_XT30UPB-M-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
-                    { "REV-50012-001-1/AMASS_XT30UPB-F-1-solid1[1]", "plastic\\medium gloss\\yellow medium gloss plastic.p2m" }, // Power plug
+                    "REV-31-1595",
+                    new Dictionary<string, string>
+                    {
+                        {
+                            "REV-30012-222-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Main case
+                        {
+                            "REV-50012-001-1/REV-50012-090-1-solid1[1]",
+                            "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Main case
+                        {
+                            "REV-30012-002-1-solid1[1]", "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Main case
+                        {
+                            "REV-50012-001-1/JST", "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-31-1153.step<1>[4]", "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-001-1/WFD-PZ2_54-32AT-2_5MM-1-solid1[1]",
+                            "plastic\\medium gloss\\dark grey medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-001-1/EDAC_690-005-299-043-1-solid1[1]",
+                            "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-002-1-solid3[1]", "plastic\\medium gloss\\cream medium gloss plastic.p2m"
+                        }, // Connectors
+                        {
+                            "REV-50012-001-1/AMASS_XT30UPB-M-1-solid1[1]",
+                            "plastic\\medium gloss\\yellow medium gloss plastic.p2m"
+                        }, // Power plug
+                        {
+                            "REV-50012-001-1/AMASS_XT30UPB-F-1-solid1[1]",
+                            "plastic\\medium gloss\\yellow medium gloss plastic.p2m"
+                        }, // Power plug
+                    }
                 }
-            }
-        };
+            };
 
         private static void FixPartAppearance(SldWorks swApp, PartDoc part, string sku)
         {
@@ -230,10 +286,10 @@ namespace FRITES.Core
         }
 
         private static void ApplyAppearance(
-    SldWorks swApp,
-    string appearance,
-    ModelDoc2 model,
-    Body2 body)
+            SldWorks swApp,
+            string appearance,
+            ModelDoc2 model,
+            Body2 body)
         {
             string installDir = Path.GetDirectoryName(swApp.GetExecutablePath());
 
@@ -255,7 +311,7 @@ namespace FRITES.Core
 
             object entity = body;
 
-            
+
             if (!renderMat.AddEntity(entity))
                 throw new Exception("Failed to add body to render material.");
 
@@ -267,25 +323,28 @@ namespace FRITES.Core
         }
 
         public static string ImportStep(
-    SldWorks swApp,
-    string sku,
-    string name,
-    string stepFile,
-    string outputFile,
-    bool preload = false,
-    string swMaterial = null,
-    string swFinish = null)
+            SldWorks swApp,
+            string sku,
+            string name,
+            string stepFile,
+            string outputFile,
+            bool preload = false,
+            string swMaterial = null,
+            string swFinish = null)
         {
-            bool was3dInterconnectEnabled = swApp.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect);
-            int previousImportNeutralAssemblyStructureMapping = swApp.GetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping);
+            bool was3dInterconnectEnabled =
+                swApp.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect);
+            int previousImportNeutralAssemblyStructureMapping =
+                swApp.GetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e
+                    .swImportNeutralAssemblyStructureMapping);
 
             swApp.SetUserPreferenceToggle(
                 (int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect,
                 true);
 
             swApp.SetUserPreferenceIntegerValue(
-    (int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping,
-    (int)swImportNeutralAssemblyStructureMapping_e.swImportNeutralAssemblyStructureMapping_MultibodyPart);
+                (int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping,
+                (int)swImportNeutralAssemblyStructureMapping_e.swImportNeutralAssemblyStructureMapping_MultibodyPart);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
 
@@ -383,8 +442,14 @@ namespace FRITES.Core
                     }
                 }
 
-                
+
                 FixPartAppearance(swApp, part, sku);
+
+                stepDoc.ShowNamedView2("*Isometric", (int)swStandardViews_e.swIsometricView);
+                stepDoc.ViewZoomtofit2();
+                stepDoc.GraphicsRedraw2();
+                stepDoc.EditRebuild3();
+                stepDoc.ForceRebuild3(false);
 
                 int saveErrors = 0;
                 int saveWarnings = 0;
@@ -413,12 +478,12 @@ namespace FRITES.Core
 
                 // RESTORE USER'S SETTINGS
                 swApp.SetUserPreferenceToggle(
-                (int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect,
-                was3dInterconnectEnabled);
+                    (int)swUserPreferenceToggle_e.swMultiCAD_Enable3DInterconnect,
+                    was3dInterconnectEnabled);
 
                 swApp.SetUserPreferenceIntegerValue(
-        (int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping,
-        previousImportNeutralAssemblyStructureMapping);
+                    (int)swUserPreferenceIntegerValue_e.swImportNeutralAssemblyStructureMapping,
+                    previousImportNeutralAssemblyStructureMapping);
             }
 
             if (!preload)
@@ -447,7 +512,8 @@ namespace FRITES.Core
             {
                 try
                 {
-                    using (HttpResponseMessage response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead))
+                    using (HttpResponseMessage response =
+                           await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead))
                     {
                         response.EnsureSuccessStatusCode();
 
@@ -471,7 +537,9 @@ namespace FRITES.Core
                         {
                             File.Delete(destinationPath);
                         }
-                        catch { }
+                        catch
+                        {
+                        }
                     }
 
                     if (attempt < DownloadRetryCount)
@@ -522,7 +590,8 @@ namespace FRITES.Core
             {
                 try
                 {
-                    using (var response = await _httpClient.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead))
+                    using (var response =
+                           await _httpClient.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead))
                     {
                         response.EnsureSuccessStatusCode();
 
@@ -551,7 +620,9 @@ namespace FRITES.Core
                         if (File.Exists(thumbPath))
                             File.Delete(thumbPath);
                     }
-                    catch { }
+                    catch
+                    {
+                    }
 
                     if (attempt < DownloadRetryCount)
                         await Task.Delay(TimeSpan.FromSeconds(2));
