@@ -22,8 +22,8 @@ class Program
             sw.Visible = true;
             sw.UserControl = true;
 
-            sw.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
-            sw.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
+            // sw.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
+            // sw.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
 
 
             try
